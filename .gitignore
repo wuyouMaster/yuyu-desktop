@@ -1,0 +1,11 @@
+node_modules/
+.runtime/
+.tmp/
+out/
+dist/
+test-results/
+playwright-report/
+*.log
+.env
+.env.*
+.DS_Store

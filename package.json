@@ -1,0 +1,24 @@
+{
+  "name": "yuyu-desktop",
+  "version": "0.0.0-migration.1",
+  "private": true,
+  "packageManager": "pnpm@7.33.7",
+  "description": "YUYU public application migration foundation; full Electron application is not yet migrated",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run && node --test tests/tooling/public-app-export.test.mjs",
+    "runtime:list": "node scripts/runtime-cli.mjs list",
+    "runtime:install": "node scripts/runtime-cli.mjs install",
+    "runtime:verify": "node scripts/runtime-cli.mjs verify"
+  },
+  "dependencies": {
+    "unzipper": "0.12.5",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  },
+  "type": "module"
+}
