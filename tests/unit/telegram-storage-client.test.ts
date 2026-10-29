@@ -12,6 +12,14 @@ const description = {
 const options = { slot: 0, account: 'telegram-local:' + 'a'.repeat(24), dataRoot: '/fixture/tdata' }
 
 describe('public Telegram storage consumer', () => {
+  it('rejects an older runtime without cache capability instead of returning an empty result', async () => {
+    const call = vi.fn().mockResolvedValue({ ...description, methods: ['storage.inspect'] })
+    const client = new TelegramStorageClient({ call } as unknown as RuntimeRpcClient)
+    await expect(client.openCache(options)).rejects.toMatchObject({
+      code: 'CAPABILITY_UNAVAILABLE'
+    })
+    expect(call).toHaveBeenCalledTimes(1)
+  })
   it('rejects incompatible capabilities before reading account data', async () => {
     const call = vi.fn().mockResolvedValue({ ...description, methods: [] })
     const client = new TelegramStorageClient({ call } as unknown as RuntimeRpcClient)
