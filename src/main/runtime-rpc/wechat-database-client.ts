@@ -1,7 +1,12 @@
 import { z } from 'zod'
+import { WechatDatabaseMonitor } from './wechat-database-monitor'
 import { RuntimeRpcError, type RuntimeJson } from '../../shared/runtime-rpc'
 import { wechatStorageDescriptionSchema } from '../../shared/wechat-storage-protocol'
 import {
+  databaseVoiceQuerySchema,
+  databaseVoiceSchema,
+  databaseObservationSchema,
+  type WechatVoiceQuery,
   databaseOpenSchema,
   databaseSessionSchema,
   databaseMessageSchema,
@@ -34,6 +39,7 @@ function check<T>(schema: z.ZodType<T>, value: unknown, code = 'INVALID_RUNTIME_
  * This client intentionally exposes only operations implemented by the candidate.
  */
 export class WechatDatabaseClient {
+  private readonly monitor = new WechatDatabaseMonitor(this)
   private methods?: Set<string>
   private account?: WechatDatabaseOpen
   private opening = false
@@ -186,7 +192,25 @@ export class WechatDatabaseClient {
       options
     )
   }
+  async voiceAsync(query: WechatVoiceQuery, options?: CallOptions) {
+    return this.asyncCall(
+      'database.voice',
+      { query: check(databaseVoiceQuerySchema, query, 'INVALID_ARGUMENT') },
+      databaseVoiceSchema,
+      options
+    )
+  }
+  observeAsync(options?: CallOptions) {
+    return this.asyncCall('database.observe', {}, databaseObservationSchema, options)
+  }
+  startMonitor(changed: (type: string, json: string) => void, failed: (error: unknown) => void) {
+    return this.monitor.start(changed, failed)
+  }
+  stopMonitor(): void {
+    this.monitor.stop()
+  }
   close(): void {
+    this.stopMonitor()
     if (this.opening) throw new RuntimeRpcError('DATABASE_OPENING')
     if (!this.account) return
     if (this.stopping) return
@@ -199,6 +223,7 @@ export class WechatDatabaseClient {
     this.account = undefined
   }
   async closeAsync(timeoutMs = 8000): Promise<boolean> {
+    this.stopMonitor()
     if (this.opening) throw new RuntimeRpcError('DATABASE_OPENING')
     if (!this.account) return true
     if (this.stopping) return this.stopping

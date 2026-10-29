@@ -92,6 +92,25 @@ describe('public database consumer validation and ownership', () => {
     expect(await client.closeAsync()).toBe(true)
     expect(await client.closeAsync()).toBe(true)
   })
+  it('cancels pending monitor initialization when its account closes', async () => {
+    const { rpc, client } = fixture(['database.open', 'database.close', 'database.observe'])
+    client.open('/fixture/account', key)
+    let complete!: (value: string) => void
+    rpc.callAsync.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve
+        })
+    )
+    const changed = vi.fn()
+    const started = client.startMonitor(changed, vi.fn())
+    const signal = rpc.callAsync.mock.calls[0][2].signal as AbortSignal
+    expect(await client.closeAsync()).toBe(true)
+    expect(signal.aborted).toBe(true)
+    complete('a'.repeat(64))
+    expect(await started).toBe(false)
+    expect(changed).not.toHaveBeenCalled()
+  })
   it('coalesces simultaneous close calls without freeing twice', async () => {
     const { rpc, client } = fixture()
     client.open('/fixture/account', key)

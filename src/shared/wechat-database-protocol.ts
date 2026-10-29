@@ -101,3 +101,24 @@ export const databaseCatalogSchema = z.enum([
 export type WechatDatabaseOpen = z.infer<typeof databaseOpenSchema>
 export type WechatDatabaseQuery = z.infer<typeof databaseQuerySchema>
 export type WechatDatabaseCatalog = z.infer<typeof databaseCatalogSchema>
+
+export const databaseVoiceQuerySchema = z
+  .object({
+    conversation: z.string().min(1).max(256),
+    created: integer.nonnegative(),
+    localId: integer.nonnegative().default(0),
+    serverId: z
+      .string()
+      .regex(/^(0|[1-9][0-9]{0,18})$/)
+      .refine((v) => BigInt(v) <= 9223372036854775807n)
+      .default('0')
+  })
+  .strict()
+  .refine((q) => q.localId > 0 || q.serverId !== '0')
+export const databaseVoiceSchema = z
+  .string()
+  .max(4 * 1024 * 1024)
+  .regex(/^(?:[a-f0-9]{2})+$/)
+  .nullable()
+export const databaseObservationSchema = z.string().regex(/^[a-f0-9]{64}$/)
+export type WechatVoiceQuery = z.input<typeof databaseVoiceQuerySchema>
