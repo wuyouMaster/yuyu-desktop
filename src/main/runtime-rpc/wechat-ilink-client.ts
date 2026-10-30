@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { isAbsolute } from 'node:path'
+import { mediaRelativePathSchema } from '../../shared/wechat-media-files-protocol'
 import { RuntimeRpcError, type RuntimeJson } from '../../shared/runtime-rpc'
 import { wechatStorageDescriptionSchema } from '../../shared/wechat-storage-protocol'
 import type { DatabaseRpcTransport } from './wechat-database-client'
@@ -122,6 +124,34 @@ export class WechatILinkClient {
     return check(
       z.object({ clientId: z.string().regex(/^yuyu-[a-f0-9]{32}$/) }).strict(),
       await this.call('ilink.sendPlainText', { ownerId: owner, to, text }, signal, 20000, true)
+    )
+  }
+  async sendMediaFile(
+    owner: string,
+    input: { root: string; path: string; to: string; kind: 'image' | 'video' | 'file' },
+    signal?: AbortSignal
+  ) {
+    check(ownerId, owner, 'INVALID_ARGUMENT')
+    const value = check(
+      z
+        .object({
+          root: z.string().refine(isAbsolute),
+          path: mediaRelativePathSchema,
+          to: z.string().trim().min(1),
+          kind: z.enum(['image', 'video', 'file'])
+        })
+        .strict(),
+      input,
+      'INVALID_ARGUMENT'
+    )
+    return check(
+      z
+        .object({
+          clientId: z.string().regex(/^yuyu-[a-f0-9]{32}$/),
+          itemType: z.union([z.literal(2), z.literal(4), z.literal(5)])
+        })
+        .strict(),
+      await this.call('ilink.sendMediaFile', { ownerId: owner, ...value }, signal, 95000, true)
     )
   }
   async beginLogin(root: string, signal?: AbortSignal) {

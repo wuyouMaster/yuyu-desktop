@@ -13,6 +13,7 @@
   },
   "include": [
     "src/**/*.ts",
-    "tests/unit/**/*.ts"
+    "tests/unit/**/*.ts",
+    "tests/runtime-protocol/**/*.ts"
   ]
 }

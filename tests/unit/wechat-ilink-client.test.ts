@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { WechatILinkClient } from '../../src/main/runtime-rpc/wechat-ilink-client'
 import { RuntimeRpcError } from '../../src/shared/runtime-rpc'
@@ -30,6 +31,7 @@ function fixture(handler: (method: string, params: unknown) => unknown) {
             'ilink.poll',
             'ilink.ack',
             'ilink.sendPlainText',
+            'ilink.sendMediaFile',
             'ilink.loginPoll',
             'ilink.accounts'
           ]
@@ -40,6 +42,48 @@ function fixture(handler: (method: string, params: unknown) => unknown) {
   return { rpc, client: new WechatILinkClient(rpc as DatabaseRpcTransport) }
 }
 describe('iLink protocol consumer', () => {
+  it('sends an explicit file request once, validates paths and retains ambiguous failure', async () => {
+    const { client, rpc } = fixture(() => {
+      throw new RuntimeRpcError('ILINK_HTTP_FAILED', true)
+    })
+    const request = {
+      root: resolve('synthetic-media'),
+      path: 'synthetic.bin',
+      to: 'synthetic-peer',
+      kind: 'file' as const
+    }
+    await expect(
+      client.sendMediaFile(owner, { ...request, path: '../escape' })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(rpc.callAsync).not.toHaveBeenCalled()
+    await expect(client.sendMediaFile(owner, request)).rejects.toMatchObject({
+      resultUnknown: true
+    })
+    expect(
+      rpc.callAsync.mock.calls.filter(([method]) => method === 'ilink.sendMediaFile')
+    ).toHaveLength(1)
+    expect(rpc.callAsync).toHaveBeenCalledWith(
+      'ilink.sendMediaFile',
+      { ownerId: owner, ...request },
+      expect.objectContaining({ sideEffect: true })
+    )
+  })
+  it('does not accept private CDN keys or unsupported media result types', async () => {
+    const { client } = fixture(() => ({
+      clientId: 'yuyu-' + 'a'.repeat(32),
+      itemType: 4,
+      aesKey: 'must-stay-native'
+    }))
+    await expect(
+      client.sendMediaFile(owner, {
+        root: resolve('synthetic-media'),
+        path: 'synthetic.bin',
+        to: 'peer',
+        kind: 'file'
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_RUNTIME_RESPONSE' })
+  })
+
   it('acknowledges only after successful delivery and preserves 64-bit identifiers', async () => {
     const order: string[] = []
     const { client } = fixture((method) => {

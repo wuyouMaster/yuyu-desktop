@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "rootDir": "src",
+    "outDir": "out/worker",
+    "noEmitOnError": true
+  },
+  "files": [
+    "src/main/runtime-rpc/bridge-worker.ts"
+  ]
+}

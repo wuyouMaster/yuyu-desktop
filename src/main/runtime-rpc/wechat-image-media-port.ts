@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { realpathSync } from 'node:fs'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import type { DatabasePort } from '../../shared/database-port'
 import type {
@@ -34,6 +35,7 @@ const digest = (data: string | Buffer) => createHash('sha256').update(data).dige
 export class WechatImageMediaPort implements ImageMediaPort {
   private diagnostic: ImageDecodeDiagnostic = { code: 'NOT_RUN', detail: '尚未执行图片解析' }
   private readonly root: string
+  private readonly canonicalRoot: string
   private readonly cache: ImagePresentationCache
   private receipts = new Map<string, { sourceSha256: string; dataHash: string; mime: string }>()
   constructor(
@@ -46,25 +48,39 @@ export class WechatImageMediaPort implements ImageMediaPort {
       throw new RuntimeRpcError('INVALID_ARGUMENT')
     files.assertImageCapabilities()
     this.root = resolve(root)
-    if (database && resolve(database.getAccountRoot()) !== this.root)
+    this.canonicalRoot = realpathSync(root)
+    if (database && !this.matchesRoot(database.getAccountRoot()))
       throw new RuntimeRpcError('ACCOUNT_MISMATCH')
     this.cache = new ImagePresentationCache(
       cacheDirectory,
-      this.root,
+      this.canonicalRoot,
       async (path) => (await files.fingerprint(path)).sha256
     )
   }
+  private matchesRoot(path: string): boolean {
+    try {
+      return realpathSync(path) === this.canonicalRoot
+    } catch {
+      return false
+    }
+  }
   private local(path: string): string {
-    const value = isAbsolute(path) ? relative(this.root, resolve(path)).split(sep).join('/') : path
-    const parsed = mediaRelativePathSchema.safeParse(value)
-    if (!parsed.success) throw new RuntimeRpcError('MEDIA_PATH_INVALID')
-    return parsed.data
+    const candidates = isAbsolute(path)
+      ? [this.root, this.canonicalRoot].map((root) =>
+          relative(root, resolve(path)).split(sep).join('/')
+        )
+      : [path]
+    for (const value of candidates) {
+      const parsed = mediaRelativePathSchema.safeParse(value)
+      if (parsed.success) return parsed.data
+    }
+    throw new RuntimeRpcError('MEDIA_PATH_INVALID')
   }
   private absolute(path: string): string {
     return resolve(this.root, this.local(path))
   }
   private query(md5?: string, datName?: string, options: ImageFindOptions = {}) {
-    if (options.accountDir && resolve(options.accountDir) !== this.root)
+    if (options.accountDir && !this.matchesRoot(options.accountDir))
       throw new RuntimeRpcError('ACCOUNT_MISMATCH')
     return {
       md5,
