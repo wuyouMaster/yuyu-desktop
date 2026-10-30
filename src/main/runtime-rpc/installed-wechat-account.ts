@@ -9,6 +9,7 @@ import { WechatDatabaseRuntime } from './wechat-database-runtime'
 import { WechatImageMediaPort } from './wechat-image-media-port'
 import { WechatMediaFilesClient } from './wechat-media-files-client'
 import { WechatStorageClient } from './wechat-storage-client'
+import { WechatAudioCodecPort } from './wechat-audio-codec-port'
 
 /** Main-process inputs only. item must come from the application's reviewed catalog,
  * not renderer IPC. Credentials are neither persisted nor placed in argv/environment.
@@ -26,6 +27,7 @@ export interface InstalledWechatAccount {
   database: DatabaseConnectionRegistration
   images: ImageMediaPort
   storage: WechatStorageClient
+  audio: WechatAudioCodecPort
   /** Shared owner: cancels observation and releases images before the database/transport. */
   close(): Promise<void>
 }
@@ -115,6 +117,7 @@ export async function openInstalledWechatAccount(
       },
       images: image,
       storage: new WechatStorageClient(rpc),
+      audio: new WechatAudioCodecPort(rpc),
       close
     }
   } catch (error) {
