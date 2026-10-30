@@ -32,6 +32,7 @@ export function selectRuntime(
 ): RuntimePackage
 export function readActive(home: string): Promise<Record<string, RuntimeActive>>
 export function verifyRuntime(home: string, item: RuntimePackage): Promise<string>
+export function verifyRuntimeSync(home: string, item: RuntimePackage): string
 export function installRuntime(options: {
   home: string
   item: RuntimePackage

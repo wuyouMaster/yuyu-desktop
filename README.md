@@ -35,8 +35,9 @@ x64/ARM64 仅交叉编译，实机测试待安排。没有真实账号登录、�
 
 ## 剩余迁移和发布边界
 
-仍需接入产品 provider、数据库密钥授权、完整 iLink 编排/远程媒体/typing，以及
-Electron 主进程、preload、Renderer、构建和完整业务回归。完整源码清单及许可证/署名
+数据库密钥授权适配、语音编解码和 iLink 账号/登录/轮询/回复上下文/远程媒体/typing
+协议编排已具备离线验证；尚需完成产品 provider 与完整 Electron 主进程、preload、Renderer
+集成、独立启动和业务回归。完整源码清单及许可证/署名
 审查尚未完成；当前不授予新许可。不用空数据、降级实现或跳过测试代替缺失能力。
 
 仓库不包含原私库历史、二进制、私有实现、研究材料、日志或凭据。
@@ -61,3 +62,11 @@ corepack pnpm test:runtime:protocol
 图片密钥自动检查另有未打包的 dev.9 候选：只处理所选账号和支持的元数据目录，
 仅在完整样本校验且 runtime 正常关闭后报告成功。该适配器只声明 autoGetImageKey；
 不代表数据库进程捕获、提权或 Intel 安装已经完成，也不属于 dev.8 安装包能力。
+
+
+新增安装包同步校验与受控 host 工厂：仅运行应用固定目录内且完整校验成功的 host，
+清理继承环境，并保留授权操作所需的关闭宽限。`WechatCDNClient` 使用 512 KiB 分块
+传输 64 MiB 以内消息媒体，核对输入/输出 SHA-256，不在应用内实现解密。
+真实候选 host 的合成 9 MiB CDN 测试需显式提供 `YUYU_TEST_WECHAT_HOST`，先构建 worker，
+再运行 `pnpm test:runtime:protocol tests/runtime-protocol/wechat-cdn.test.ts`。
+输入缺失或密文损坏均失败；不代表真实账号、Windows 实机或公共发布验收。

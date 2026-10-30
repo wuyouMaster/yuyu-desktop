@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { promises as fs } from 'node:fs'
+import { promises as fs, readFileSync, realpathSync, lstatSync } from 'node:fs'
 import path from 'node:path'
 import unzipper from 'unzipper'
 
@@ -56,6 +56,28 @@ export async function verifyRuntime(home, item) {
     const stat = await fs.lstat(p)
     assert(stat.isFile() && !stat.isSymbolicLink(), '运行时文件类型异常')
     const bytes = await fs.readFile(p)
+    assert(bytes.length === file.size && hash(bytes) === file.sha256, '运行时文件校验失败')
+    if (process.platform !== 'win32')
+      assert((stat.mode & 0o777) === file.mode, '运行时文件权限校验失败')
+  }
+  return root
+}
+
+/** Synchronous application ports use the same complete manifest checks before
+ * creating their owned worker. The async installer remains the activation owner. */
+export function verifyRuntimeSync(home, item) {
+  const root = packageDirectory(home, item)
+  const manifestBytes = readFileSync(path.join(root, 'runtime-manifest.json'))
+  assert(hash(manifestBytes) === item.manifestSha256, '已安装清单校验失败')
+  const manifest = JSON.parse(manifestBytes.toString('utf8'))
+  validateManifest(manifest, item)
+  const realRoot = realpathSync(root)
+  for (const file of manifest.files) {
+    const p = path.join(root, file.path)
+    assert(realpathSync(p).startsWith(realRoot + path.sep), '运行时文件越界')
+    const stat = lstatSync(p)
+    assert(stat.isFile() && !stat.isSymbolicLink(), '运行时文件类型异常')
+    const bytes = readFileSync(p)
     assert(bytes.length === file.size && hash(bytes) === file.sha256, '运行时文件校验失败')
     if (process.platform !== 'win32')
       assert((stat.mode & 0o777) === file.mode, '运行时文件权限校验失败')
