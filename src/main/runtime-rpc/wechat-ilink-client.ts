@@ -14,7 +14,28 @@ const message = z
     fromUserId: z.string().min(1),
     messageId: z.string(),
     messageType: z.number().int(),
-    items: z.array(z.object({ type: z.number().int(), text: z.string().optional() }).strict()),
+    items: z.array(
+      z
+        .object({
+          type: z.number().int(),
+          text: z.string().optional(),
+          media: z
+            .object({
+              id: z.string().regex(/^[a-f0-9]{32}$/),
+              kind: z.enum(['image', 'voice', 'file', 'video']),
+              name: z.string().max(256).optional(),
+              size: z
+                .number()
+                .int()
+                .positive()
+                .max(2 ** 31)
+                .optional()
+            })
+            .strict()
+            .optional()
+        })
+        .strict()
+    ),
     receivedAt: z.number().int().nonnegative(),
     seq: z
       .string()
@@ -117,18 +138,37 @@ export class WechatILinkClient {
     await this.acknowledge(owner, value.batchId, signal)
     return value.messages.length
   }
-  async sendPlainText(owner: string, to: string, text: string, signal?: AbortSignal) {
+  async sendPlainText(
+    owner: string,
+    to: string,
+    text: string,
+    signal?: AbortSignal,
+    contextToken?: string
+  ) {
     check(ownerId, owner, 'INVALID_ARGUMENT')
     check(z.string().trim().min(1), to, 'INVALID_ARGUMENT')
     check(z.string().trim().min(1), text, 'INVALID_ARGUMENT')
+    check(z.string().max(8192).optional(), contextToken, 'INVALID_ARGUMENT')
     return check(
       z.object({ clientId: z.string().regex(/^yuyu-[a-f0-9]{32}$/) }).strict(),
-      await this.call('ilink.sendPlainText', { ownerId: owner, to, text }, signal, 20000, true)
+      await this.call(
+        'ilink.sendPlainText',
+        { ownerId: owner, to, text, ...(contextToken ? { contextToken } : {}) },
+        signal,
+        20000,
+        true
+      )
     )
   }
   async sendMediaFile(
     owner: string,
-    input: { root: string; path: string; to: string; kind: 'image' | 'video' | 'file' },
+    input: {
+      root: string
+      path: string
+      to: string
+      kind: 'image' | 'video' | 'file'
+      contextToken?: string
+    },
     signal?: AbortSignal
   ) {
     check(ownerId, owner, 'INVALID_ARGUMENT')
@@ -138,7 +178,8 @@ export class WechatILinkClient {
           root: z.string().refine(isAbsolute),
           path: mediaRelativePathSchema,
           to: z.string().trim().min(1),
-          kind: z.enum(['image', 'video', 'file'])
+          kind: z.enum(['image', 'video', 'file']),
+          contextToken: z.string().max(8192).optional()
         })
         .strict(),
       input,
@@ -154,6 +195,77 @@ export class WechatILinkClient {
       await this.call('ilink.sendMediaFile', { ownerId: owner, ...value }, signal, 95000, true)
     )
   }
+  resolveContextToken(owner: string, to: string): string | undefined {
+    check(ownerId, owner, 'INVALID_ARGUMENT')
+    check(z.string().trim().min(1).max(1024), to, 'INVALID_ARGUMENT')
+    if (!this.methods?.has('ilink.context')) throw new RuntimeRpcError('CAPABILITY_UNAVAILABLE')
+    return (
+      check(z.string().max(8192), this.rpc.call('ilink.context', { ownerId: owner, to })) ||
+      undefined
+    )
+  }
+  async sendMediaURL(
+    owner: string,
+    input: { url: string; to: string; kind: 'image' | 'video' | 'file'; contextToken?: string },
+    signal?: AbortSignal
+  ) {
+    check(ownerId, owner, 'INVALID_ARGUMENT')
+    const value = check(
+      z
+        .object({
+          url: z
+            .url()
+            .max(8192)
+            .refine((url) => /^https?:\/\//.test(url)),
+          to: z.string().trim().min(1),
+          kind: z.enum(['image', 'video', 'file']),
+          contextToken: z.string().max(8192).optional()
+        })
+        .strict(),
+      input,
+      'INVALID_ARGUMENT'
+    )
+    return check(
+      z
+        .object({
+          clientId: z.string().regex(/^yuyu-[a-f0-9]{32}$/),
+          itemType: z.union([z.literal(2), z.literal(4), z.literal(5)])
+        })
+        .strict(),
+      await this.call('ilink.sendMediaURL', { ownerId: owner, ...value }, signal, 155000, true)
+    )
+  }
+  async downloadMedia(
+    owner: string,
+    mediaId: string,
+    root: string,
+    path: string,
+    signal?: AbortSignal
+  ) {
+    check(ownerId, owner, 'INVALID_ARGUMENT')
+    check(z.string().regex(/^[a-f0-9]{32}$/), mediaId, 'INVALID_ARGUMENT')
+    check(z.string().refine(isAbsolute), root, 'INVALID_ARGUMENT')
+    check(mediaRelativePathSchema, path, 'INVALID_ARGUMENT')
+    return check(
+      z
+        .object({
+          size: z
+            .number()
+            .int()
+            .nonnegative()
+            .max(2 ** 31),
+          sha256: z.string().regex(/^[a-f0-9]{64}$/)
+        })
+        .strict(),
+      await this.call(
+        'ilink.downloadMedia',
+        { ownerId: owner, mediaId, root, path },
+        signal,
+        65000,
+        true
+      )
+    )
+  }
   async notify(owner: string, action: 'start' | 'stop', signal?: AbortSignal) {
     check(ownerId, owner, 'INVALID_ARGUMENT')
     check(z.enum(['start', 'stop']), action, 'INVALID_ARGUMENT')
@@ -162,12 +274,18 @@ export class WechatILinkClient {
       await this.call('ilink.notify', { ownerId: owner, action }, signal, 5000, true)
     )
   }
-  async beginTyping(owner: string, to: string, signal?: AbortSignal) {
+  async beginTyping(owner: string, to: string, signal?: AbortSignal, contextToken?: string) {
     check(ownerId, owner, 'INVALID_ARGUMENT')
     check(z.string().trim().min(1).max(1024), to, 'INVALID_ARGUMENT')
     const value = check(
       z.object({ leaseId: z.string().regex(/^[a-f0-9]{32}$/) }).strict(),
-      await this.call('ilink.typingBegin', { ownerId: owner, to }, signal, 25000, true)
+      await this.call(
+        'ilink.typingBegin',
+        { ownerId: owner, to, ...(contextToken ? { contextToken } : {}) },
+        signal,
+        25000,
+        true
+      )
     )
     let stopping: Promise<void> | undefined
     return {

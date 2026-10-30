@@ -133,3 +133,85 @@ describe('iLink protocol consumer', () => {
     })
   })
 })
+
+describe('iLink media and delayed reply contract', () => {
+  const methods = [
+    'ilink.sendMediaURL',
+    'ilink.sendPlainText',
+    'ilink.context',
+    'ilink.poll',
+    'ilink.downloadMedia'
+  ]
+  function native(handler: (method: string, params: any) => unknown) {
+    const rpc = {
+      call: vi.fn(handler),
+      callAsync: vi.fn(async (method: string, params: any) =>
+        method === 'runtime.describe'
+          ? {
+              protocol: 1,
+              application: 'wechat',
+              implementation: 'go',
+              platform: 'darwin',
+              arch: 'arm64',
+              version: 'fixture',
+              methods
+            }
+          : handler(method, params)
+      )
+    }
+    return { rpc, client: new WechatILinkClient(rpc as DatabaseRpcTransport) }
+  }
+  it('preserves the original message context and never retries an uncertain remote send', async () => {
+    const f = native(() => {
+      throw new RuntimeRpcError('ILINK_HTTP_FAILED', true)
+    })
+    await expect(
+      f.client.sendPlainText(owner, 'peer', 'reply', undefined, 'original-context')
+    ).rejects.toMatchObject({ resultUnknown: true })
+    expect(f.rpc.callAsync).toHaveBeenCalledWith(
+      'ilink.sendPlainText',
+      { ownerId: owner, to: 'peer', text: 'reply', contextToken: 'original-context' },
+      expect.objectContaining({ sideEffect: true })
+    )
+    await expect(
+      f.client.sendMediaURL(owner, {
+        url: 'https://example.invalid/file.bin',
+        to: 'peer',
+        kind: 'file',
+        contextToken: 'original-context'
+      })
+    ).rejects.toMatchObject({ resultUnknown: true })
+    expect(f.rpc.callAsync.mock.calls.filter(([m]) => m === 'ilink.sendMediaURL')).toHaveLength(1)
+  })
+  it('accepts only opaque media references and strict download evidence', async () => {
+    const ref = { id: 'c'.repeat(32), kind: 'file', name: 'synthetic.bin', size: 7 }
+    const f = native((method) =>
+      method === 'ilink.poll'
+        ? { batchId, messages: [{ ...message, items: [{ type: 4, media: ref }] }] }
+        : { size: 7, sha256: 'd'.repeat(64) }
+    )
+    expect((await f.client.poll(owner)).messages[0].items[0].media).toEqual(ref)
+    expect(
+      await f.client.downloadMedia(owner, ref.id, resolve('synthetic-media'), 'received.bin')
+    ).toEqual({ size: 7, sha256: 'd'.repeat(64) })
+    const bad = native(() => ({
+      batchId,
+      messages: [{ ...message, items: [{ type: 4, media: { ...ref, aesKey: 'secret' } }] }]
+    }))
+    await expect(bad.client.poll(owner)).rejects.toMatchObject({ code: 'INVALID_RUNTIME_RESPONSE' })
+    const count = f.rpc.callAsync.mock.calls.length
+    await expect(
+      f.client.downloadMedia(owner, ref.id, resolve('synthetic-media'), '../escape')
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(f.rpc.callAsync).toHaveBeenCalledTimes(count)
+  })
+  it('uses a native context lookup only after capability negotiation', async () => {
+    const f = native((method) =>
+      method === 'ilink.poll' ? { batchId, messages: [] } : 'persisted-context'
+    )
+    expect(() => f.client.resolveContextToken(owner, 'peer')).toThrow('CAPABILITY_UNAVAILABLE')
+    await f.client.poll(owner)
+    expect(f.client.resolveContextToken(owner, 'peer')).toBe('persisted-context')
+    expect(f.rpc.call).toHaveBeenCalledWith('ilink.context', { ownerId: owner, to: 'peer' })
+  })
+})

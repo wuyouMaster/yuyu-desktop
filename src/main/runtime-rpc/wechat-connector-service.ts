@@ -238,29 +238,81 @@ export class RuntimeWechatConnectorService {
     if (account && account !== value.account) throw new RuntimeRpcError('ILINK_ACCOUNT_MISMATCH')
     return value
   }
-  sendText(input: { to: string; text: string; accountId?: string; signal?: AbortSignal }) {
+  sendText(input: {
+    to: string
+    text: string
+    contextToken?: string
+    accountId?: string
+    signal?: AbortSignal
+  }) {
     const c = this.requireConnection(input.accountId)
-    return c.client.sendPlainText(c.owner, input.to, input.text, input.signal)
+    return c.client.sendPlainText(c.owner, input.to, input.text, input.signal, input.contextToken)
   }
   sendMediaFile(input: {
     root: string
     path: string
     to: string
     kind: 'image' | 'video' | 'file'
+    contextToken?: string
     accountId?: string
     signal?: AbortSignal
   }) {
     const c = this.requireConnection(input.accountId)
     return c.client.sendMediaFile(
       c.owner,
-      { root: input.root, path: input.path, to: input.to, kind: input.kind },
+      {
+        root: input.root,
+        path: input.path,
+        to: input.to,
+        kind: input.kind,
+        ...(input.contextToken ? { contextToken: input.contextToken } : {})
+      },
       input.signal
     )
   }
-  async beginTyping(input: { to: string; accountId?: string; signal?: AbortSignal }) {
+  resolveContextToken(accountId: string | undefined, to: string) {
+    const c = this.requireConnection(accountId)
+    return c.client.resolveContextToken(c.owner, to)
+  }
+  sendMediaURL(input: {
+    url: string
+    to: string
+    kind: 'image' | 'video' | 'file'
+    contextToken?: string
+    accountId?: string
+    signal?: AbortSignal
+  }) {
+    const c = this.requireConnection(input.accountId)
+    return c.client.sendMediaURL(
+      c.owner,
+      {
+        url: input.url,
+        to: input.to,
+        kind: input.kind,
+        ...(input.contextToken ? { contextToken: input.contextToken } : {})
+      },
+      input.signal
+    )
+  }
+  downloadMedia(input: {
+    mediaId: string
+    root: string
+    path: string
+    accountId?: string
+    signal?: AbortSignal
+  }) {
+    const c = this.requireConnection(input.accountId)
+    return c.client.downloadMedia(c.owner, input.mediaId, input.root, input.path, input.signal)
+  }
+  async beginTyping(input: {
+    to: string
+    accountId?: string
+    signal?: AbortSignal
+    contextToken?: string
+  }) {
     const c = this.requireConnection(input.accountId)
     try {
-      return await c.client.beginTyping(c.owner, input.to, input.signal)
+      return await c.client.beginTyping(c.owner, input.to, input.signal, input.contextToken)
     } catch (error) {
       if (input.signal?.aborted || c.abort.signal.aborted) throw cancelled()
       this.report('ILINK_TYPING_UNAVAILABLE')
