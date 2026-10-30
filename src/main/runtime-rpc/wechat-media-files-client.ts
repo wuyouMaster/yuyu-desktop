@@ -7,6 +7,7 @@ import { wechatStorageDescriptionSchema } from '../../shared/wechat-storage-prot
 import {
   mediaChunkBytes,
   mediaDecodeBytes,
+  mediaTransferBytes,
   mediaChunkSchema,
   mediaHandleSchema,
   mediaRelativePathSchema,
@@ -17,6 +18,18 @@ import {
   type MediaTransfer
 } from '../../shared/wechat-media-files-protocol'
 import type { DatabaseRpcTransport } from './wechat-database-client'
+
+const imageInfo = z
+  .object({
+    size: z.number().int().nonnegative().max(mediaTransferBytes),
+    datVersion: z.union([z.literal(0), z.literal(2)]),
+    thumbnail: z.boolean()
+  })
+  .strict()
+const variantPaths = z
+  .array(mediaRelativePathSchema)
+  .max(10001)
+  .refine((paths) => new Set(paths).size === paths.length)
 
 function check<T>(schema: z.ZodType<T>, value: unknown, code = 'INVALID_RUNTIME_RESPONSE'): T {
   const result = schema.safeParse(value)
@@ -85,6 +98,89 @@ export class WechatMediaFilesClient {
       mediaRelativePathSchema.nullable(),
       await this.rpc.callAsync('media.find', this.params({ query: parsed }), { signal })
     )
+  }
+  private require(method: string): void {
+    if (!this.methods?.has(method)) throw new RuntimeRpcError('CAPABILITY_UNAVAILABLE')
+  }
+  assertImageCapabilities(): void {
+    this.params()
+    for (const method of [
+      'media.inspectImage',
+      'media.variants',
+      'media.selectVariant',
+      'media.thumbnail'
+    ])
+      this.require(method)
+  }
+  selectVariant(path: string, allowThumbnail: boolean, preferThumbnail: boolean): string | null {
+    check(mediaRelativePathSchema, path, 'INVALID_ARGUMENT')
+    this.require('media.selectVariant')
+    return check(
+      mediaRelativePathSchema.nullable(),
+      this.rpc.call('media.selectVariant', this.params({ path, allowThumbnail, preferThumbnail }))
+    )
+  }
+  async selectVariantAsync(
+    path: string,
+    allowThumbnail: boolean,
+    preferThumbnail: boolean
+  ): Promise<string | null> {
+    check(mediaRelativePathSchema, path, 'INVALID_ARGUMENT')
+    this.require('media.selectVariant')
+    return check(
+      mediaRelativePathSchema.nullable(),
+      await this.rpc.callAsync(
+        'media.selectVariant',
+        this.params({ path, allowThumbnail, preferThumbnail })
+      )
+    )
+  }
+  inspectImage(path: string) {
+    check(mediaRelativePathSchema, path, 'INVALID_ARGUMENT')
+    this.require('media.inspectImage')
+    return check(imageInfo, this.rpc.call('media.inspectImage', this.params({ path })))
+  }
+  async inspectImageAsync(path: string) {
+    check(mediaRelativePathSchema, path, 'INVALID_ARGUMENT')
+    this.require('media.inspectImage')
+    return check(imageInfo, await this.rpc.callAsync('media.inspectImage', this.params({ path })))
+  }
+  variants(path: string, allowThumbnail: boolean): string[] {
+    check(mediaRelativePathSchema, path, 'INVALID_ARGUMENT')
+    this.require('media.variants')
+    return check(
+      variantPaths,
+      this.rpc.call('media.variants', this.params({ path, allowThumbnail }))
+    )
+  }
+  async variantsAsync(path: string, allowThumbnail: boolean): Promise<string[]> {
+    check(mediaRelativePathSchema, path, 'INVALID_ARGUMENT')
+    this.require('media.variants')
+    return check(
+      variantPaths,
+      await this.rpc.callAsync('media.variants', this.params({ path, allowThumbnail }))
+    )
+  }
+  thumbnail(name: string): boolean {
+    check(z.string().max(4096), name, 'INVALID_ARGUMENT')
+    this.require('media.thumbnail')
+    return check(z.boolean(), this.rpc.call('media.thumbnail', this.params({ name })))
+  }
+  async fingerprint(path: string): Promise<{ size: number; sha256: string }> {
+    check(mediaRelativePathSchema, path, 'INVALID_ARGUMENT')
+    const owner = this.params() as { sessionId: string }
+    const raw = await this.rpc.callAsync('media.fileOpen', { ...owner, path })
+    try {
+      const info = this.info(raw, path, false)
+      return { size: info.size, sha256: info.sha256 }
+    } finally {
+      const handle = mediaHandleSchema.safeParse((raw as { transferId?: unknown })?.transferId)
+      if (handle.success)
+        check(
+          z.literal(true),
+          await this.rpc.callAsync('media.release', { ...owner, transferId: handle.data })
+        )
+    }
   }
   private chunk(value: RuntimeJson, info: MediaTransfer, offset: number): Buffer {
     const parsed = check(mediaChunkSchema, value)

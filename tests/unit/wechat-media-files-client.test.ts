@@ -49,6 +49,12 @@ function fixture(data = Buffer.from([137, 80, 78, 71, 1])) {
   return { client, call, callAsync, info, chunk }
 }
 describe('bounded media transfer consumer', () => {
+  it('refuses a complete image adapter when the runtime only supports byte transfers', () => {
+    const f = fixture()
+    expect(() => f.client.assertImageCapabilities()).toThrow('CAPABILITY_UNAVAILABLE')
+    f.client.close()
+    expect(() => f.client.assertImageCapabilities()).toThrow('MEDIA_SESSION_CLOSED')
+  })
   it('verifies exact bytes in sync and async decoding and releases both handles', async () => {
     const f = fixture()
     expect(f.client.decode('fixture.dat').data).toEqual(Buffer.from([137, 80, 78, 71, 1]))

@@ -54,7 +54,11 @@ export const mediaTransferSchema = z
       'image/wxgf'
     ]),
     diagnostic: z.enum(['FILE', 'SUCCESS', 'DIRECT_IMAGE', 'WXGF_REQUIRES_DECODER']),
-    requiresDecoder: z.boolean()
+    requiresDecoder: z.boolean(),
+    sourceSha256: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional()
   })
   .strict()
   .refine(
