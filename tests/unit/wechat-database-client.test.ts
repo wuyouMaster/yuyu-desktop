@@ -43,6 +43,68 @@ function fixture(
   return { rpc, client: new WechatDatabaseClient(rpc) }
 }
 describe('public database consumer validation and ownership', () => {
+  const pagedMethods = [
+    'database.open',
+    'database.close',
+    'database.messagesOpen',
+    'database.messagesRead',
+    'database.messagesClose'
+  ]
+  it('releases malformed allocated cursors without accepting invalid ordering', () => {
+    const { rpc, client } = fixture(pagedMethods)
+    client.open('/fixture/account', key)
+    rpc.call.mockReturnValueOnce({ queryId: 'cd'.repeat(24), reverse: false } as never)
+    rpc.call.mockReturnValueOnce(true as never)
+    expect(() => client.pagedMessages({ conversation: 'fixture' })).toThrow(
+      'INVALID_RUNTIME_RESPONSE'
+    )
+    expect(rpc.call).toHaveBeenLastCalledWith('database.messagesClose', {
+      sessionId: opened.sessionId,
+      queryId: 'cd'.repeat(24)
+    })
+  })
+  it('rejects empty nonterminal pages and still releases their cursor', async () => {
+    const { rpc, client } = fixture(pagedMethods)
+    client.open('/fixture/account', key)
+    rpc.callAsync.mockResolvedValueOnce({ queryId: 'cd'.repeat(24), reverse: true })
+    rpc.callAsync.mockResolvedValueOnce({ rows: [], done: false })
+    rpc.callAsync.mockResolvedValueOnce(true)
+    await expect(client.pagedMessagesAsync({ conversation: 'fixture' })).rejects.toThrow(
+      'INVALID_RUNTIME_RESPONSE'
+    )
+    expect(rpc.callAsync).toHaveBeenLastCalledWith('database.messagesClose', {
+      sessionId: opened.sessionId,
+      queryId: 'cd'.repeat(24)
+    })
+  })
+  it('cleans canceled reads with a fresh request and preserves the actual failure', async () => {
+    const { rpc, client } = fixture(pagedMethods)
+    client.open('/fixture/account', key)
+    const abort = new AbortController()
+    rpc.callAsync.mockResolvedValueOnce({ queryId: 'cd'.repeat(24), reverse: true })
+    rpc.callAsync.mockImplementationOnce(async () => {
+      abort.abort()
+      throw new RuntimeRpcError('CANCELLED')
+    })
+    rpc.callAsync.mockRejectedValueOnce(new RuntimeRpcError('QUERY_NOT_FOUND'))
+    await expect(
+      client.pagedMessagesAsync({ conversation: 'fixture' }, { signal: abort.signal })
+    ).rejects.toThrow('CANCELLED')
+    expect(rpc.callAsync.mock.calls.at(-1)).toEqual([
+      'database.messagesClose',
+      { sessionId: opened.sessionId, queryId: 'cd'.repeat(24) }
+    ])
+  })
+  it('does not hide a cleanup failure following a successful page', async () => {
+    const { rpc, client } = fixture(pagedMethods)
+    client.open('/fixture/account', key)
+    rpc.callAsync.mockResolvedValueOnce({ queryId: 'cd'.repeat(24), reverse: true })
+    rpc.callAsync.mockResolvedValueOnce({ rows: [], done: true })
+    rpc.callAsync.mockRejectedValueOnce(new RuntimeRpcError('DATABASE_OPERATION_FAILED'))
+    await expect(client.pagedMessagesAsync({ conversation: 'fixture' })).rejects.toThrow(
+      'DATABASE_OPERATION_FAILED'
+    )
+  })
   it('rejects invalid credentials before starting an account', () => {
     const { rpc, client } = fixture()
     expect(() => client.open('/fixture/account', 'short')).toThrow('INVALID_ARGUMENT')

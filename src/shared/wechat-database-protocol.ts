@@ -122,3 +122,51 @@ export const databaseVoiceSchema = z
   .nullable()
 export const databaseObservationSchema = z.string().regex(/^[a-f0-9]{64}$/)
 export type WechatVoiceQuery = z.input<typeof databaseVoiceQuerySchema>
+
+export const databaseContactDetailsSchema = z
+  .array(
+    z
+      .object({
+        username: text.min(1),
+        wxid: text.min(1),
+        wechatId: optionalText,
+        legacyIdentifier: optionalText,
+        avatar: optionalText
+      })
+      .strict()
+  )
+  .max(2000)
+export const databaseGroupIdsSchema = z
+  .array(
+    z
+      .object({
+        roomId: text.min(1),
+        status: z.enum(['ok', 'not_found']),
+        memberWxids: z.array(text.min(1)).max(100000)
+      })
+      .strict()
+  )
+  .max(500)
+export const databaseImageHardlinkSchema = z
+  .object({
+    file_name: text.min(1),
+    relativePath: text,
+    dir1: text.min(1),
+    dir2: text.min(1)
+  })
+  .strict()
+  .nullable()
+export const databaseVideoHardlinkSchema = z
+  .object({ resolved_md5: text.min(1) })
+  .strict()
+  .nullable()
+export const databasePagedQuerySchema = databaseQuerySchema.safeExtend({
+  limit: integer.min(1).max(1000000).optional()
+})
+export const databaseCursorSchema = z
+  .object({ queryId: z.string().regex(/^[a-f0-9]{48}$/), reverse: z.boolean() })
+  .strict()
+export const databasePageSchema = z
+  .object({ rows: z.array(databaseMessageSchema).max(128), done: z.boolean() })
+  .strict()
+  .refine((p) => p.done || p.rows.length > 0)

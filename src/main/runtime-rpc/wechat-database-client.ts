@@ -4,6 +4,13 @@ import { RuntimeRpcError, type RuntimeJson } from '../../shared/runtime-rpc'
 import { wechatStorageDescriptionSchema } from '../../shared/wechat-storage-protocol'
 import {
   databaseVoiceQuerySchema,
+  databaseContactDetailsSchema,
+  databaseGroupIdsSchema,
+  databaseImageHardlinkSchema,
+  databaseVideoHardlinkSchema,
+  databasePagedQuerySchema,
+  databaseCursorSchema,
+  databasePageSchema,
   databaseVoiceSchema,
   databaseObservationSchema,
   type WechatVoiceQuery,
@@ -46,6 +53,14 @@ export class WechatDatabaseClient {
   private closing = false
   private stopping?: Promise<boolean>
   constructor(private readonly rpc: DatabaseRpcTransport) {}
+  supports(method: string): boolean {
+    this.describe()
+    return !!this.methods?.has(method)
+  }
+  accountInfo(): WechatDatabaseOpen {
+    if (!this.account || this.closing) throw new RuntimeRpcError('DATABASE_CLOSED')
+    return { ...this.account, selfCandidates: [...this.account.selfCandidates] }
+  }
   private describe(): void {
     if (!this.methods)
       this.methods = new Set(
@@ -137,6 +152,153 @@ export class WechatDatabaseClient {
     check(z.array(z.string().min(1).max(256)).max(2000), usernames, 'INVALID_ARGUMENT')
     return this.asyncCall('database.contacts', { usernames }, databaseRowsSchema, options)
   }
+  contactDetails(usernames: string[]) {
+    check(z.array(z.string().min(1).max(256)).max(2000), usernames, 'INVALID_ARGUMENT')
+    return this.call('database.contactDetails', { usernames }, databaseContactDetailsSchema)
+  }
+  contactDetailsAsync(usernames: string[], options?: CallOptions) {
+    check(z.array(z.string().min(1).max(256)).max(2000), usernames, 'INVALID_ARGUMENT')
+    return this.asyncCall(
+      'database.contactDetails',
+      { usernames },
+      databaseContactDetailsSchema,
+      options
+    )
+  }
+  avatars(usernames: string[]) {
+    check(z.array(z.string().min(1).max(256)).max(2000), usernames, 'INVALID_ARGUMENT')
+    return this.call('database.avatars', { usernames }, z.record(z.string(), z.string()))
+  }
+  avatarsAsync(usernames: string[], options?: CallOptions) {
+    check(z.array(z.string().min(1).max(256)).max(2000), usernames, 'INVALID_ARGUMENT')
+    return this.asyncCall(
+      'database.avatars',
+      { usernames },
+      z.record(z.string(), z.string()),
+      options
+    )
+  }
+  usernameByHash(md5: string) {
+    check(z.string().regex(/^[a-f0-9]{32}$/i), md5, 'INVALID_ARGUMENT')
+    return this.call('database.usernameByHash', { md5 }, z.string().min(1).nullable())
+  }
+  groupIdsAsync(rooms: string[], options?: CallOptions) {
+    check(z.array(z.string().min(1).max(256)).max(500), rooms, 'INVALID_ARGUMENT')
+    return this.asyncCall('database.groupMemberIds', { rooms }, databaseGroupIdsSchema, options)
+  }
+  emoticonURL(md5: string) {
+    check(z.string().regex(/^[a-f0-9]{32}$/i), md5, 'INVALID_ARGUMENT')
+    return this.call('database.emoticonURL', { md5 }, z.string().min(1).nullable())
+  }
+  imageHardlink(md5: string) {
+    check(z.string().regex(/^[a-f0-9]{32}$/i), md5, 'INVALID_ARGUMENT')
+    return this.call('database.imageHardlink', { md5 }, databaseImageHardlinkSchema)
+  }
+  imageHardlinkAsync(md5: string, options?: CallOptions) {
+    check(z.string().regex(/^[a-f0-9]{32}$/i), md5, 'INVALID_ARGUMENT')
+    return this.asyncCall('database.imageHardlink', { md5 }, databaseImageHardlinkSchema, options)
+  }
+  videoHardlink(md5: string) {
+    check(z.string().regex(/^[a-f0-9]{32}$/i), md5, 'INVALID_ARGUMENT')
+    return this.call('database.videoHardlink', { md5 }, databaseVideoHardlinkSchema)
+  }
+  pagedMessages(query: WechatDatabaseQuery) {
+    const input = check(databasePagedQuerySchema, query, 'INVALID_ARGUMENT')
+    const owner = { sessionId: this.accountInfo().sessionId }
+    this.require('database.messagesOpen')
+    this.require('database.messagesRead')
+    this.require('database.messagesClose')
+    const raw = this.rpc.call('database.messagesOpen', json({ ...owner, query: input }))
+    const allocated = databaseCursorSchema.shape.queryId.safeParse(
+      (raw as { queryId?: unknown })?.queryId
+    )
+    const rows: z.infer<typeof databaseMessageSchema>[] = []
+    let complete = false
+    let size = 0
+    try {
+      const cursor = check(databaseCursorSchema, raw)
+      if (cursor.reverse !== (query.kind !== 'image' && query.order !== 'desc'))
+        throw new RuntimeRpcError('INVALID_RUNTIME_RESPONSE')
+      for (;;) {
+        const page = check(
+          databasePageSchema,
+          this.rpc.call('database.messagesRead', { ...owner, queryId: cursor.queryId })
+        )
+        size += Buffer.byteLength(JSON.stringify(page.rows))
+        if (size > 256 * 1024 * 1024) throw new RuntimeRpcError('RESULT_TOO_LARGE')
+        rows.push(...page.rows)
+        if (rows.length > (query.limit ?? 1000000))
+          throw new RuntimeRpcError('INVALID_RUNTIME_RESPONSE')
+        if (page.done) break
+      }
+      complete = true
+      return cursor.reverse ? rows.reverse() : rows
+    } finally {
+      try {
+        if (allocated.success)
+          check(
+            z.literal(true),
+            this.rpc.call('database.messagesClose', { ...owner, queryId: allocated.data })
+          )
+      } catch (error) {
+        if (complete) throw error
+      }
+    }
+  }
+  async pagedMessagesAsync(query: WechatDatabaseQuery, options?: CallOptions) {
+    const input = check(databasePagedQuerySchema, query, 'INVALID_ARGUMENT')
+    const owner = { sessionId: this.accountInfo().sessionId }
+    this.require('database.messagesOpen')
+    this.require('database.messagesRead')
+    this.require('database.messagesClose')
+    const raw = await this.rpc.callAsync(
+      'database.messagesOpen',
+      json({ ...owner, query: input }),
+      options
+    )
+    const allocated = databaseCursorSchema.shape.queryId.safeParse(
+      (raw as { queryId?: unknown })?.queryId
+    )
+    const rows: z.infer<typeof databaseMessageSchema>[] = []
+    let complete = false
+    let size = 0
+    try {
+      const cursor = check(databaseCursorSchema, raw)
+      if (cursor.reverse !== (query.kind !== 'image' && query.order !== 'desc'))
+        throw new RuntimeRpcError('INVALID_RUNTIME_RESPONSE')
+      for (;;) {
+        const page = check(
+          databasePageSchema,
+          await this.rpc.callAsync(
+            'database.messagesRead',
+            { ...owner, queryId: cursor.queryId },
+            options
+          )
+        )
+        size += Buffer.byteLength(JSON.stringify(page.rows))
+        if (size > 256 * 1024 * 1024) throw new RuntimeRpcError('RESULT_TOO_LARGE')
+        rows.push(...page.rows)
+        if (rows.length > (query.limit ?? 1000000))
+          throw new RuntimeRpcError('INVALID_RUNTIME_RESPONSE')
+        if (page.done) break
+      }
+      complete = true
+      return cursor.reverse ? rows.reverse() : rows
+    } finally {
+      try {
+        if (allocated.success)
+          check(
+            z.literal(true),
+            await this.rpc.callAsync('database.messagesClose', {
+              ...owner,
+              queryId: allocated.data
+            })
+          )
+      } catch (error) {
+        if (complete) throw error
+      }
+    }
+  }
   messages(query: WechatDatabaseQuery) {
     return this.call(
       'database.messages',
@@ -157,6 +319,14 @@ export class WechatDatabaseClient {
       'database.count',
       { query: check(databaseQuerySchema, query, 'INVALID_ARGUMENT') },
       databaseCountSchema,
+      options
+    )
+  }
+  countProbeAsync(query: WechatDatabaseQuery, options?: CallOptions) {
+    return this.asyncCall(
+      'database.countProbe',
+      { query: check(databaseQuerySchema, query, 'INVALID_ARGUMENT') },
+      databaseCountSchema.extend({ typeColumn: z.string().nullable() }),
       options
     )
   }

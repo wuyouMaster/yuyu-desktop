@@ -42,3 +42,8 @@ Telegram 缓存、微信身份和消息解析已有本地 Go 候选与公共消�
 监控停止后阻止迟到回调，后端错误上报并停止；这不是逐行日志或撤回保护。
 媒体单次请求目前限制 4 MiB，大媒体、路径定位和完整业务尚未接通。
 Windows x64/ARM64 后端交叉编译成功，实机测试待安排，未宣称 Windows 功能通过。
+
+The candidate now includes a complete application DatabasePort adapter with account-owned cursors,
+identity/avatar/group/catalog/hardlink methods and a DatabaseRuntimePort lifecycle. It still requires
+the unpublished matching native host and has not replaced production providers or the default runtime
+catalog. This repository remains a protocol foundation, not the completed Electron application.
