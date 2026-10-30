@@ -154,6 +154,40 @@ export class WechatILinkClient {
       await this.call('ilink.sendMediaFile', { ownerId: owner, ...value }, signal, 95000, true)
     )
   }
+  async notify(owner: string, action: 'start' | 'stop', signal?: AbortSignal) {
+    check(ownerId, owner, 'INVALID_ARGUMENT')
+    check(z.enum(['start', 'stop']), action, 'INVALID_ARGUMENT')
+    check(
+      z.literal(true),
+      await this.call('ilink.notify', { ownerId: owner, action }, signal, 5000, true)
+    )
+  }
+  async beginTyping(owner: string, to: string, signal?: AbortSignal) {
+    check(ownerId, owner, 'INVALID_ARGUMENT')
+    check(z.string().trim().min(1).max(1024), to, 'INVALID_ARGUMENT')
+    const value = check(
+      z.object({ leaseId: z.string().regex(/^[a-f0-9]{32}$/) }).strict(),
+      await this.call('ilink.typingBegin', { ownerId: owner, to }, signal, 25000, true)
+    )
+    let stopping: Promise<void> | undefined
+    return {
+      stop: (): Promise<void> => {
+        stopping ??= (async () => {
+          check(
+            z.literal(true),
+            await this.call(
+              'ilink.typingEnd',
+              { ownerId: owner, leaseId: value.leaseId },
+              undefined,
+              5000,
+              true
+            )
+          )
+        })()
+        return stopping
+      }
+    }
+  }
   async beginLogin(root: string, signal?: AbortSignal) {
     check(z.string().min(1), root, 'INVALID_ARGUMENT')
     return check(
