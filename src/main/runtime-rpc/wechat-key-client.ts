@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isAbsolute } from 'node:path'
 import { RuntimeRpcError, type RuntimeJson } from '../../shared/runtime-rpc'
 import { wechatStorageDescriptionSchema } from '../../shared/wechat-storage-protocol'
 import type { DatabaseRpcTransport } from './wechat-database-client'
@@ -70,6 +71,15 @@ export class WechatKeyClient {
         { pid, root, timeoutMs },
         { timeoutMs: timeoutMs + KEY_RUNTIME_SHUTDOWN_GRACE_MS, signal, sideEffect: true }
       )
+    )
+  }
+  async discoverImage(root: string, account = '', signal?: AbortSignal) {
+    check(z.string().refine(isAbsolute), root, 'INVALID_ARGUMENT')
+    check(z.string().max(256), account, 'INVALID_ARGUMENT')
+    await this.require('key.discoverImage')
+    return check(
+      imageResult,
+      await this.rpc.callAsync('key.discoverImage', { root, account }, { signal })
     )
   }
   async verifyImage(
