@@ -7,6 +7,7 @@ import type { DatabaseRpcTransport } from './wechat-database-client'
 /** Give a native helper time to restore the target before the host is terminated.
  * This changes shutdown cleanup only; operation/test deadlines remain unchanged. */
 export const KEY_RUNTIME_SHUTDOWN_GRACE_MS = 7000
+export const KEY_AUTHORIZATION_WAIT_MS = 120_000
 const identity = z
   .object({
     platform: z.string().min(1),
@@ -61,7 +62,7 @@ export class WechatKeyClient {
   }
   async captureDatabase(pid: number, root: string, timeoutMs: number, signal?: AbortSignal) {
     check(z.number().int().min(1).max(0x7fffffff), pid, 'INVALID_ARGUMENT')
-    check(z.string().min(1), root, 'INVALID_ARGUMENT')
+    check(z.string().refine(isAbsolute), root, 'INVALID_ARGUMENT')
     check(z.number().int().min(1).max(300000), timeoutMs, 'INVALID_ARGUMENT')
     await this.require('key.captureDatabase')
     return check(
@@ -70,6 +71,25 @@ export class WechatKeyClient {
         'key.captureDatabase',
         { pid, root, timeoutMs },
         { timeoutMs: timeoutMs + KEY_RUNTIME_SHUTDOWN_GRACE_MS, signal, sideEffect: true }
+      )
+    )
+  }
+  /** Explicit user operation: native runtime owns the system authorization dialog.
+   * pid=0 selects the unique supported client belonging to the initiating user. */
+  async captureDatabaseAuthorized(root: string, timeoutMs: number, signal?: AbortSignal) {
+    check(z.string().refine(isAbsolute), root, 'INVALID_ARGUMENT')
+    check(z.number().int().min(1).max(300000), timeoutMs, 'INVALID_ARGUMENT')
+    await this.require('key.captureDatabaseAuthorized')
+    return check(
+      accountResult,
+      await this.rpc.callAsync(
+        'key.captureDatabaseAuthorized',
+        { pid: 0, root, timeoutMs },
+        {
+          timeoutMs: KEY_AUTHORIZATION_WAIT_MS + timeoutMs + KEY_RUNTIME_SHUTDOWN_GRACE_MS,
+          signal,
+          sideEffect: true
+        }
       )
     )
   }
