@@ -13,6 +13,8 @@ export interface RuntimeRpcClientOptions {
   args?: string[]
   env?: NodeJS.ProcessEnv
   maxPending?: number
+  /** Native cleanup budget; separate from operation deadlines. */
+  shutdownGraceMs?: number
 }
 interface Pending {
   resolve(value: RuntimeJson): void
@@ -28,7 +30,16 @@ export class RuntimeRpcClient {
   private closed = false
   private failure?: RuntimeRpcError
   private stopping?: Promise<void>
-  constructor(private readonly options: RuntimeRpcClientOptions) {}
+  private usedSideEffects = false
+  constructor(private readonly options: RuntimeRpcClientOptions) {
+    if (
+      options.shutdownGraceMs !== undefined &&
+      (!Number.isInteger(options.shutdownGraceMs) ||
+        options.shutdownGraceMs < 100 ||
+        options.shutdownGraceMs > 10000)
+    )
+      throw new RuntimeRpcError('INVALID_ARGUMENT')
+  }
 
   private start(): ChildProcessWithoutNullStreams {
     if (this.closed) throw new RuntimeRpcError('RUNTIME_CLOSED')
@@ -109,6 +120,7 @@ export class RuntimeRpcClient {
     try {
       data = encodeRuntimeRpcFrame({ protocol: 1, type: 'request', id, method, params })
       child = this.start()
+      this.usedSideEffects ||= !!options.sideEffect
     } catch (error) {
       return Promise.reject(error)
     }
@@ -144,12 +156,25 @@ export class RuntimeRpcClient {
     this.closed = true
     this.fail(new RuntimeRpcError('RUNTIME_CLOSED'))
     const child = this.child
-    if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve()
-    this.stopping = new Promise((resolve) => {
-      const kill = setTimeout(() => child.kill('SIGKILL'), 1000)
+    if (!child) return Promise.resolve()
+    if (child.exitCode !== null || child.signalCode !== null) {
+      this.stopping =
+        this.usedSideEffects && (child.exitCode !== 0 || child.signalCode !== null)
+          ? Promise.reject(new RuntimeRpcError('RUNTIME_CLEANUP_UNCONFIRMED', true))
+          : Promise.resolve()
+      return this.stopping
+    }
+    this.stopping = new Promise((resolve, reject) => {
+      let forced = false
+      const kill = setTimeout(() => {
+        forced = true
+        child.kill('SIGKILL')
+      }, this.options.shutdownGraceMs ?? 1000)
       child.once('close', () => {
         clearTimeout(kill)
-        resolve()
+        if (forced || (this.usedSideEffects && (child.exitCode !== 0 || child.signalCode !== null)))
+          reject(new RuntimeRpcError('RUNTIME_CLEANUP_UNCONFIRMED', true))
+        else resolve()
       })
       child.stdin.end()
     })

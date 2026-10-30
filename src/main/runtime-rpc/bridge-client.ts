@@ -35,9 +35,23 @@ export class RuntimeRpcBridgeClient {
   private failure?: string
   private stopping?: Promise<void>
   private exited = false
+  private readonly shutdownGraceMs: number
+  private cleanupFailure?: string
+  private usedSideEffects = false
+  private cleanupReported = false
   constructor(workerPath: string, options: RuntimeRpcClientOptions) {
+    this.shutdownGraceMs = options.shutdownGraceMs ?? 1000
+    if (
+      !Number.isInteger(this.shutdownGraceMs) ||
+      this.shutdownGraceMs < 100 ||
+      this.shutdownGraceMs > 10000
+    )
+      throw new RuntimeRpcError('INVALID_ARGUMENT')
     this.worker = new Worker(workerPath, { workerData: options })
-    this.worker.on('message', (message: { id?: string }) => {
+    this.worker.on('message', (message: { id?: string; type?: string; code?: string }) => {
+      if (message.type === 'closed') this.cleanupReported = true
+      if (message.type === 'closed' && message.code)
+        this.cleanupFailure = 'RUNTIME_CLEANUP_UNCONFIRMED'
       const pending = this.pending.get(message.id ?? '')
       if (!pending) return
       this.pending.delete(pending.task.request.id)
@@ -51,6 +65,8 @@ export class RuntimeRpcBridgeClient {
     this.worker.on('error', () => this.fail('BRIDGE_FAILED'))
     this.worker.on('exit', () => {
       this.exited = true
+      if (this.usedSideEffects && !this.cleanupReported)
+        this.cleanupFailure = 'RUNTIME_CLEANUP_UNCONFIRMED'
       this.fail('BRIDGE_EXITED')
     })
   }
@@ -79,6 +95,7 @@ export class RuntimeRpcBridgeClient {
       params
     }
     encodeRuntimeRpcFrame(request)
+    this.usedSideEffects ||= !!options.sideEffect
     return {
       request,
       buffer: new SharedArrayBuffer(8 + RUNTIME_RPC_MAX_FRAME_BYTES + 1),
@@ -159,12 +176,21 @@ export class RuntimeRpcBridgeClient {
     if (this.stopping) return this.stopping
     this.closed = true
     this.fail('RUNTIME_CLOSED')
-    if (this.exited) return Promise.resolve()
-    this.stopping = new Promise((resolve) => {
-      const kill = setTimeout(() => void this.worker.terminate(), 2000)
+    if (this.exited) {
+      this.stopping = this.cleanupFailure
+        ? Promise.reject(new RuntimeRpcError(this.cleanupFailure, true))
+        : Promise.resolve()
+      return this.stopping
+    }
+    this.stopping = new Promise((resolve, reject) => {
+      const kill = setTimeout(() => {
+        this.cleanupFailure = 'RUNTIME_CLEANUP_UNCONFIRMED'
+        void this.worker.terminate()
+      }, this.shutdownGraceMs + 1000)
       this.worker.once('exit', () => {
         clearTimeout(kill)
-        resolve()
+        if (this.cleanupFailure) reject(new RuntimeRpcError(this.cleanupFailure, true))
+        else resolve()
       })
       this.worker.postMessage({ type: 'close' })
     })

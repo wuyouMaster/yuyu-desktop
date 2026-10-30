@@ -25,8 +25,14 @@ port.on(
     if (message.type === 'close') {
       closing = true
       for (const controller of active.values()) controller.abort()
-      await client.close()
-      port.close()
+      try {
+        await client.close()
+        port.postMessage({ type: 'closed' })
+      } catch {
+        port.postMessage({ type: 'closed', code: 'RUNTIME_CLEANUP_UNCONFIRMED' })
+      } finally {
+        port.close()
+      }
       return
     }
     if (message.type === 'cancel') {

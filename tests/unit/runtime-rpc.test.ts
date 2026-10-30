@@ -60,6 +60,27 @@ describe('runtime protocol framing', () => {
 })
 
 describe('real child transport', () => {
+  it('waits for native cleanup beyond the ordinary host budget when explicitly configured', async () => {
+    const client = new RuntimeRpcClient({
+      executable: process.execPath,
+      shutdownGraceMs: 1500,
+      args: ['-e', `${echo}\nprocess.stdin.on('end',()=>setTimeout(()=>process.exit(0),1100));`]
+    })
+    await client.call('echo', {})
+    await expect(client.close()).resolves.toBeUndefined()
+  })
+  it('reports forced termination as unconfirmed cleanup', async () => {
+    const client = new RuntimeRpcClient({
+      executable: process.execPath,
+      shutdownGraceMs: 100,
+      args: ['-e', `${echo}\nsetInterval(()=>{},1000);`]
+    })
+    await client.call('echo', {})
+    await expect(client.close()).rejects.toMatchObject({
+      code: 'RUNTIME_CLEANUP_UNCONFIRMED',
+      resultUnknown: true
+    })
+  })
   it('correlates concurrent out-of-order responses without retry', async () => {
     const client = child(echo)
     expect(
@@ -115,6 +136,20 @@ describe('real child transport', () => {
 })
 
 describe('host isolation', () => {
+  it('retains cleanup uncertainty when a side-effect owner exited before close', async () => {
+    const client = new RuntimeRpcClient({
+      executable: process.execPath,
+      args: ['-e', 'process.exit(7)']
+    })
+    await expect(client.call('send', {}, { sideEffect: true })).rejects.toMatchObject({
+      code: 'RUNTIME_EXITED',
+      resultUnknown: true
+    })
+    await expect(client.close()).rejects.toMatchObject({
+      code: 'RUNTIME_CLEANUP_UNCONFIRMED',
+      resultUnknown: true
+    })
+  })
   it('uses an explicit method allowlist and redacts implementation exceptions', async () => {
     const input = new PassThrough(),
       output = new PassThrough()

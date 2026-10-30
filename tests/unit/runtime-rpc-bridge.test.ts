@@ -46,6 +46,18 @@ function create(): RuntimeRpcBridgeClient {
   return client
 }
 describe('one native owner across sync and async application methods', () => {
+  it('forwards forced-cleanup failure through the worker', async () => {
+    const client = new RuntimeRpcBridgeClient(worker, {
+      executable: process.execPath,
+      args: ['-e', `${host}\nsetInterval(()=>{},1000)`],
+      shutdownGraceMs: 100
+    })
+    client.call('fixture.next', {})
+    await expect(client.close()).rejects.toMatchObject({
+      code: 'RUNTIME_CLEANUP_UNCONFIRMED',
+      resultUnknown: true
+    })
+  })
   it('keeps one process and request state while a synchronous call overlaps async I/O', async () => {
     const client = create()
     const first = client.call('fixture.next', {}) as { counter: number; pid: number }
@@ -88,6 +100,11 @@ describe('one native owner across sync and async application methods', () => {
       resultUnknown: true
     })
     expect(() => client.call('fixture.next', {})).toThrow('RUNTIME_EXITED')
+    await expect(client.close()).rejects.toMatchObject({
+      code: 'RUNTIME_CLEANUP_UNCONFIRMED',
+      resultUnknown: true
+    })
+    clients.splice(clients.indexOf(client), 1)
   })
   it('closes even when the worker failed before the close request', async () => {
     const client = new RuntimeRpcBridgeClient(join(root, 'missing-worker.js'), {

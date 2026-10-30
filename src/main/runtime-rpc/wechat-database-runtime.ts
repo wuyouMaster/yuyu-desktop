@@ -37,7 +37,9 @@ export class WechatDatabaseRuntime implements DatabaseRuntimePort {
       client.open(options.accountRoot ?? '', options.rawKey)
       return this.connection(client, rpc, options.rawKey)
     } catch (error) {
-      void rpc.close()
+      void rpc.close().catch(() => {
+        /* Preserve the opening error; no connection was returned. */
+      })
       throw error
     }
   }
@@ -80,7 +82,9 @@ export class WechatDatabaseRuntime implements DatabaseRuntimePort {
           try {
             client.close()
           } finally {
-            void rpc.close()
+            void rpc.close().catch(() => {
+              failed = true
+            })
           }
         },
         closeAsync: async (timeoutMs) => {

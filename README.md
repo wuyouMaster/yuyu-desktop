@@ -47,3 +47,9 @@ The candidate now includes a complete application DatabasePort adapter with acco
 identity/avatar/group/catalog/hardlink methods and a DatabaseRuntimePort lifecycle. It still requires
 the unpublished matching native host and has not replaced production providers or the default runtime
 catalog. This repository remains a protocol foundation, not the completed Electron application.
+
+Key and iLink protocol consumers are now available for the unpublished candidate. They keep private
+capture/credential/wire logic in the native runtime, preserve cleanup failures and unknown send
+outcomes, and acknowledge incoming batches only after successful delivery. Actual key elevation,
+full iLink product orchestration and the full Electron application are still pending; no real-account
+acceptance or Windows execution is implied.
