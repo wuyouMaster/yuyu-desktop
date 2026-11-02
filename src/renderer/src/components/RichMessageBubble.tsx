@@ -1,0 +1,536 @@
+import { ParsedContent } from '../../../shared/types'
+import { useEffect, useState } from 'react'
+import type { JSX, MouseEvent } from 'react'
+import { renderWechatEmojiText } from '../utils/wechatEmojiText'
+import { resolveUnifiedAsset } from '../utils/unified-entity-adapter'
+import { ImageBubble } from './ImageBubble'
+import { Button } from './ui'
+import type { EntityId } from '../../../shared/entity-id'
+
+const stickerDataUrlCache = new Map<string, string>()
+
+interface RichMessageBubbleProps {
+  contentData: ParsedContent
+  assetId?: string
+  sessionId?: string
+  onImageClick?: (imageUrl: string) => void
+}
+
+export function RichMessageBubble({
+  contentData,
+  assetId,
+  sessionId,
+  onImageClick
+}: RichMessageBubbleProps): JSX.Element {
+  switch (contentData.type) {
+    case 'location':
+      return <LocationBubble data={contentData} />
+    case 'card':
+      return <CardBubble data={contentData} />
+    case 'share':
+      return <ShareBubble data={contentData} assetId={assetId} />
+    case 'forwardBundle':
+      return <ForwardBundleBubble data={contentData} />
+    case 'miniProgram':
+      return (
+        <MiniProgramBubble data={contentData} sessionId={sessionId} onImageClick={onImageClick} />
+      )
+    case 'redPacket':
+      return <RedPacketBubble data={contentData} />
+    case 'voip':
+      return <VoipBubble data={contentData} />
+    case 'sticker':
+      return <StickerBubble data={contentData} assetId={assetId} />
+    case 'quote':
+      return <QuoteBubble data={contentData} sessionId={sessionId} onImageClick={onImageClick} />
+    case 'system':
+      return <SystemBubble data={contentData} />
+    case 'unknown':
+      return (
+        <div className="unsupported-message">
+          <strong>暂不支持此消息</strong>
+          <span>
+            消息类型 {(contentData as { messageType?: string | number }).messageType || '未知'}
+          </span>
+        </div>
+      )
+    default:
+      return <div className="message-text">[不支持的消息类型]</div>
+  }
+}
+
+function ForwardBundleBubble({
+  data
+}: {
+  data: Extract<ParsedContent, { type: 'forwardBundle' }>
+}): JSX.Element {
+  const [expanded, setExpanded] = useState(false)
+  const visibleItems = expanded ? data.items : data.items.slice(0, 3)
+  const hiddenCount = Math.max(0, data.items.length - visibleItems.length)
+
+  return (
+    <div className="forward-bundle-message">
+      <button
+        type="button"
+        className="forward-bundle-header"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span>{data.title || '聊天记录'}</span>
+        <small>
+          {data.items.length ? `${data.items.length} 条消息` : data.description || '聊天记录'}
+        </small>
+      </button>
+      <div className="forward-bundle-list">
+        {visibleItems.length ? (
+          visibleItems.map((item, index) => (
+            <div
+              className="forward-bundle-item"
+              key={`${item.sender || ''}-${item.sentAt || ''}-${index}`}
+            >
+              {item.sender && <b>{item.sender}</b>}
+              <span>{renderWechatEmojiText(item.text, 24)}</span>
+              {item.nested?.length ? <small>包含 {item.nested.length} 条聊天记录</small> : null}
+            </div>
+          ))
+        ) : (
+          <div className="forward-bundle-empty">暂未解析到可展示的记录</div>
+        )}
+      </div>
+      {(hiddenCount > 0 || expanded) && data.items.length > 3 ? (
+        <button
+          type="button"
+          className="forward-bundle-toggle"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? '收起' : `展开其余 ${hiddenCount} 条`}
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+function LocationBubble({
+  data
+}: {
+  data: Extract<ParsedContent, { type: 'location' }>
+}): JSX.Element {
+  const { poiname, label, lat, lng } = data
+  const locationText = poiname || label || '位置'
+  const hasCoords = lat !== 0 || lng !== 0
+
+  const handleClick = (): void => {
+    if (hasCoords) {
+      const url = `https://maps.apple.com/?q=${encodeURIComponent(locationText)}&ll=${lat},${lng}`
+      window.open(url, '_blank')
+    }
+  }
+
+  return (
+    <div className="location-message" onClick={hasCoords ? handleClick : undefined}>
+      <div className="location-icon">位置</div>
+      <div className="location-info">
+        <div className="location-name">{locationText}</div>
+        {label && poiname && label !== poiname && <div className="location-label">{label}</div>}
+        {hasCoords && (
+          <div className="location-coords">
+            {lat.toFixed(6)}, {lng.toFixed(6)}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CardBubble({ data }: { data: Extract<ParsedContent, { type: 'card' }> }): JSX.Element {
+  const { username, nickname } = data
+
+  const handleCopy = (e: MouseEvent): void => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(username)
+  }
+
+  return (
+    <div className="card-message">
+      <div className="card-avatar">{(nickname || username).charAt(0).toUpperCase()}</div>
+      <div className="card-info">
+        <div className="card-nickname">{nickname || '未知'}</div>
+        <div className="card-username" onClick={handleCopy} title="点击复制">
+          {username}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ShareBubble({
+  data,
+  assetId
+}: {
+  data: Extract<ParsedContent, { type: 'share' }>
+  assetId?: string
+}): JSX.Element {
+  const { title, des, url, appname, articles, transfer, typeVal } = data
+
+  if (String(typeVal) === '6' || String(typeVal) === '74') {
+    return <FileBubble key={assetId} title={title} assetId={assetId} />
+  }
+
+  if (String(typeVal) === '2000' || transfer) {
+    const pay = transfer || {}
+    const meta = [pay.amountText, pay.payMemo ? `备注:${pay.payMemo}` : '', pay.transferStatusText]
+      .filter(Boolean)
+      .join(' · ')
+    return (
+      <div className="transfer-message">
+        <div className="transfer-kicker">微信转账</div>
+        <div className="transfer-title">{title || '微信转账'}</div>
+        <div className="transfer-meta">{meta || des || '转账消息'}</div>
+        {(() => {
+          const footer = [
+            pay.transferId && `单号 ${pay.transferId}`,
+            pay.transId && `trans_id ${pay.transId}`,
+            pay.feeType && `币种 ${pay.feeType}`,
+            pay.refundBankType && `退款卡类型 ${pay.refundBankType}`
+          ].filter(Boolean)
+          return footer.length ? <div className="transfer-footer">{footer.join(' · ')}</div> : null
+        })()}
+      </div>
+    )
+  }
+
+  if (articles?.length) {
+    return (
+      <div className="share-message share-message-multi">
+        {appname && <div className="share-appname">{appname}</div>}
+        <div className="share-article-list">
+          {articles.map((article, index) => (
+            <button
+              type="button"
+              className="share-article"
+              key={`${article.url}-${index}`}
+              onClick={() => article.url && window.open(article.url, '_blank')}
+            >
+              <span className="share-article-copy">
+                <strong>{article.title || '公众号文章'}</strong>
+                {article.description ? <small>{article.description}</small> : null}
+              </span>
+              {article.coverUrl ? (
+                <img src={article.coverUrl} alt="" referrerPolicy="no-referrer" />
+              ) : null}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  const handleClick = (): void => {
+    if (url) {
+      window.open(url, '_blank')
+    }
+  }
+
+  const urlHost = getUrlHost(url)
+
+  return (
+    <div className="share-message" onClick={handleClick}>
+      {appname && <div className="share-appname">{appname}</div>}
+      <div className="share-title">{title || '链接'}</div>
+      {des && <div className="share-desc">{des}</div>}
+      {urlHost && <div className="share-url">{urlHost}</div>}
+    </div>
+  )
+}
+
+function FileBubble({ title, assetId }: { title?: string; assetId?: string }): JSX.Element {
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string>()
+  const [saved, setSaved] = useState(false)
+  const [asset, setAsset] = useState<Awaited<ReturnType<typeof resolveUnifiedAsset>>>()
+
+  useEffect(() => {
+    let cancelled = false
+    if (!assetId) return
+    void resolveUnifiedAsset(assetId).then((resolved) => {
+      if (!cancelled) setAsset(resolved)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [assetId])
+
+  if (asset?.state === 'available' && asset.uri) {
+    return (
+      <div className="file-message">
+        <Button
+          variant="ghost"
+          disabled={saving}
+          onClick={async () => {
+            if (!assetId || saving) return
+            setSaving(true)
+            setSaveError(undefined)
+            setSaved(false)
+            try {
+              const result = await window.api.saveUnifiedAsset(assetId as EntityId)
+              setSaved(result.success)
+              if (!result.success && !result.canceled) setSaveError(result.error || '附件保存失败')
+            } catch {
+              setSaveError('附件保存失败，请稍后重试')
+            } finally {
+              setSaving(false)
+            }
+          }}
+        >
+          <span aria-hidden>📎</span>
+          <span>{saving ? '正在保存…' : asset.name || title || '文件'}</span>
+        </Button>
+        {saved && <small role="status">附件已保存</small>}
+        {saveError && <small role="alert">{saveError}</small>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="file-message">
+      <span aria-hidden>📎</span>
+      <span>{title || '文件'}</span>
+      {asset?.state === 'unavailable' && <small>暂未找到本地附件</small>}
+    </div>
+  )
+}
+
+function MiniProgramBubble({
+  data,
+  sessionId,
+  onImageClick
+}: {
+  data: Extract<ParsedContent, { type: 'miniProgram' }>
+  sessionId?: string
+  onImageClick?: (imageUrl: string) => void
+}): JSX.Element {
+  return (
+    <div className="mini-program-message">
+      <div className="mini-program-title">{data.title}</div>
+      {data.description && <div className="mini-program-description">{data.description}</div>}
+      {data.thumbDataUrl ? (
+        <div className="mini-program-preview">
+          <img
+            className="mini-program-inline-image"
+            src={data.thumbDataUrl}
+            alt={data.title}
+            onClick={() => onImageClick?.(data.thumbDataUrl || '')}
+          />
+        </div>
+      ) : data.thumbMd5 ? (
+        <div className="mini-program-preview">
+          <ImageBubble
+            imageMd5={data.thumbMd5}
+            imageDatName={data.thumbDatName}
+            sessionId={sessionId}
+            isThumb
+            fallbackUrl={data.iconUrl}
+            onImageClick={onImageClick}
+          />
+        </div>
+      ) : data.iconUrl ? (
+        <img className="mini-program-icon" src={data.iconUrl} alt="" referrerPolicy="no-referrer" />
+      ) : null}
+      <div className="mini-program-footer">
+        <span aria-hidden>⌁</span>
+        <span>{data.appName || '小程序'}</span>
+      </div>
+    </div>
+  )
+}
+
+function RedPacketBubble({
+  data
+}: {
+  data: Extract<ParsedContent, { type: 'redPacket' }>
+}): JSX.Element {
+  const handleClick = (): void => {
+    if (data.url) window.open(data.url, '_blank')
+  }
+  const statusText = data.pay?.redPacketStatusText
+  const blurb = data.description || data.pay?.sceneText || '恭喜发财，大吉大利'
+
+  return (
+    <div
+      className={`red-packet-message ${data.url ? 'is-clickable' : ''}`}
+      onClick={data.url ? handleClick : undefined}
+    >
+      <div className="red-packet-main">
+        <span className="red-packet-icon" aria-hidden>
+          ¥
+        </span>
+        <span className="red-packet-copy">
+          <strong>{data.title}</strong>
+          <small>{statusText ? `${blurb} · ${statusText}` : blurb}</small>
+        </span>
+      </div>
+      <div className="red-packet-footer">微信红包</div>
+    </div>
+  )
+}
+
+function VoipBubble({ data }: { data: Extract<ParsedContent, { type: 'voip' }> }): JSX.Element {
+  const { status, roomType, duration } = data
+  const isVideo = roomType === 1
+
+  const formatDuration = (seconds: number | undefined): string => {
+    if (!seconds) return ''
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    if (mins > 0) {
+      return `${mins}分${secs}秒`
+    }
+    return `${secs}秒`
+  }
+
+  return (
+    <div className="voip-message">
+      <span className="voip-icon">{isVideo ? '视频' : '通话'}</span>
+      <span className="voip-status">
+        {status}
+        {duration ? ` ${formatDuration(duration)}` : ''}
+      </span>
+    </div>
+  )
+}
+
+function StickerBubble({
+  data,
+  assetId
+}: {
+  data: Extract<ParsedContent, { type: 'sticker' }>
+  assetId?: string
+}): JSX.Element {
+  const { md5, url, thumbUrl, encryptUrl, aeskey } = data
+  const sourceUrl = url || thumbUrl || ''
+  const cacheKey = assetId || md5 || sourceUrl
+  const [displayUrl, setDisplayUrl] = useState(() =>
+    cacheKey ? stickerDataUrlCache.get(cacheKey) || '' : ''
+  )
+  const [loading, setLoading] = useState(Boolean(sourceUrl || md5 || encryptUrl) && !displayUrl)
+  const [error, setError] = useState(false)
+  const [errorText, setErrorText] = useState('')
+
+  useEffect(() => {
+    if (!cacheKey || displayUrl || error) return
+
+    let cancelled = false
+    const load = async (): Promise<void> => {
+      try {
+        const asset = await resolveUnifiedAsset(assetId)
+        if (asset?.state === 'available' && asset.uri) {
+          stickerDataUrlCache.set(cacheKey, asset.uri)
+          setDisplayUrl(asset.uri)
+          setError(false)
+          setErrorText('')
+          return
+        }
+        if (!sourceUrl && !md5 && !encryptUrl) {
+          setError(true)
+          setErrorText(
+            (asset?.extensions?.wechat as { error?: string } | undefined)?.error || '表情包未缓存'
+          )
+          return
+        }
+        const result = await window.api.getSticker(sourceUrl, md5, { encryptUrl, aeskey })
+        if (cancelled) return
+        if (result.success && result.data) {
+          stickerDataUrlCache.set(cacheKey, result.data)
+          setDisplayUrl(result.data)
+          setError(false)
+          setErrorText('')
+        } else {
+          setError(true)
+          setErrorText(result.error || '表情包未缓存')
+        }
+      } catch {
+        if (!cancelled) {
+          setError(true)
+          setErrorText('表情包加载失败')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [aeskey, assetId, cacheKey, displayUrl, encryptUrl, error, md5, sourceUrl])
+
+  if (displayUrl) {
+    return (
+      <div className="sticker-message">
+        <img src={displayUrl} alt="表情包" className="sticker-image" referrerPolicy="no-referrer" />
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="sticker-message">
+        <div className="sticker-placeholder">表情包加载中...</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="sticker-message">
+      <div className="sticker-placeholder">{error ? errorText || '表情包未缓存' : '表情包'}</div>
+      {md5 && <div className="sticker-md5">MD5: {md5}</div>}
+    </div>
+  )
+}
+
+function QuoteBubble({
+  data,
+  sessionId,
+  onImageClick
+}: {
+  data: Extract<ParsedContent, { type: 'quote' }>
+  sessionId?: string
+  onImageClick?: (imageUrl: string) => void
+}): JSX.Element {
+  const quotedText = data.quotedContent || data.content || '[引用消息]'
+  const replyText = data.content || data.title || ''
+  const quotedSender = data.quotedSender || data.sender || ''
+  const hasQuotedImage = Boolean(data.quotedImageMd5 || data.quotedImageDatName)
+
+  return (
+    <div className="quote-message">
+      <div className={`quoted-message${hasQuotedImage ? ' quoted-message-image' : ''}`}>
+        {quotedSender && <span className="quoted-sender">{quotedSender}</span>}
+        {hasQuotedImage ? (
+          <ImageBubble
+            imageMd5={data.quotedImageMd5}
+            imageDatName={data.quotedImageDatName}
+            sessionId={sessionId}
+            isThumb
+            onImageClick={onImageClick}
+          />
+        ) : (
+          <span className="quoted-text">{renderWechatEmojiText(quotedText, 18)}</span>
+        )}
+      </div>
+      {replyText && <div className="quote-reply">{renderWechatEmojiText(replyText)}</div>}
+    </div>
+  )
+}
+
+function SystemBubble({ data }: { data: Extract<ParsedContent, { type: 'system' }> }): JSX.Element {
+  return <div className="message-text">{renderWechatEmojiText(data.content || '[系统消息]')}</div>
+}
+
+function getUrlHost(url?: string): string {
+  if (!url) return ''
+  try {
+    return new URL(url).hostname
+  } catch {
+    return url
+  }
+}

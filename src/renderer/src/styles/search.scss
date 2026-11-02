@@ -1,0 +1,1126 @@
+.ai-search-workspace {
+  --ai-search-sidebar-width: 230px;
+  --ai-search-evidence-width: 316px;
+  --ai-search-header-height: 76px;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--yuyu-ui-bg-main);
+}
+
+.ai-search-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: var(--ai-search-header-height);
+  padding: 14px 22px 12px;
+  border-bottom: 1px solid var(--yuyu-ui-border);
+  background: color-mix(in srgb, var(--yuyu-ui-bg-main) 94%, transparent);
+
+  h1 {
+    margin: 0;
+    color: var(--yuyu-ui-text-primary);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 28px;
+  }
+
+  p {
+    margin: 0;
+    color: var(--yuyu-ui-text-secondary);
+    font-size: 12px;
+    line-height: 18px;
+  }
+}
+
+.ai-search-kicker {
+  display: block;
+  color: var(--yuyu-ui-ai);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.ai-search-model-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 340px;
+  color: var(--yuyu-ui-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+
+  > span:first-child {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--yuyu-ui-text-muted);
+  }
+
+  > span {
+    &.ready {
+      background: var(--yuyu-ui-success);
+    }
+
+    &.warning {
+      background: var(--yuyu-ui-warning);
+    }
+  }
+
+  > span:nth-child(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.ai-search-grid {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(200px, var(--ai-search-sidebar-width)) minmax(0, 1fr) minmax(
+      280px,
+      var(--ai-search-evidence-width)
+    );
+}
+
+.ai-search-scope-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--yuyu-ui-bg-sidebar);
+}
+
+.ai-search-scope-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px 12px;
+  border-right: 1px solid var(--yuyu-ui-border);
+}
+
+.ai-search-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai-search-knowledge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border: 1px solid var(--yuyu-ui-border);
+  border-radius: 999px;
+  background: var(--yuyu-ui-bg-elevated);
+  color: var(--yuyu-ui-text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ai-search-knowledge-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--yuyu-ui-text-muted);
+}
+
+.ai-search-knowledge-card.building .ai-search-knowledge-dot,
+.ai-search-knowledge-card.syncing .ai-search-knowledge-dot {
+  background: var(--yuyu-ui-warning);
+}
+
+.ai-search-knowledge-card.ready .ai-search-knowledge-dot {
+  background: var(--yuyu-ui-success);
+}
+
+.ai-search-knowledge-card.error .ai-search-knowledge-dot {
+  background: var(--yuyu-ui-danger, #c15d4d);
+}
+
+.ai-search-filter-section {
+  flex: 0 0 auto;
+}
+
+.ai-search-secondary-menu,
+.ai-search-time-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-search-secondary-menu button,
+.ai-search-time-menu button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: var(--yuyu-ui-radius-sm) !important;
+  background: transparent !important;
+  color: var(--yuyu-ui-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.ai-search-secondary-menu button:hover,
+.ai-search-time-menu button:hover {
+  background: rgba(255, 255, 255, 0.45) !important;
+  color: var(--yuyu-ui-text-primary);
+}
+
+.ai-search-secondary-menu button.active,
+.ai-search-time-menu button.active {
+  background: var(--yuyu-ui-brand-soft) !important;
+  color: var(--yuyu-ui-brand) !important;
+  font-weight: 600;
+}
+
+.ai-search-secondary-menu button:disabled {
+  color: var(--yuyu-ui-text-muted);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.ai-search-secondary-menu button span,
+.ai-search-time-menu button span {
+  width: 18px;
+  color: currentColor;
+  font-size: 14px;
+  text-align: center;
+}
+
+.ai-search-time-section {
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--yuyu-ui-border);
+}
+
+.ai-search-knowledge-card {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+  padding: 12px;
+  border: 1px solid var(--yuyu-ui-glass-border);
+  border-radius: var(--yuyu-ui-radius-md);
+  background: var(--yuyu-ui-glass-primary);
+  box-shadow: var(--yuyu-ui-shadow-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.ai-search-knowledge-card.error {
+  border-color: color-mix(in srgb, var(--yuyu-ui-danger) 40%, var(--yuyu-ui-glass-border));
+}
+
+.ai-search-knowledge-card-heading,
+.ai-search-sync-progress-top,
+.ai-search-knowledge-details > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ai-search-knowledge-card-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-search-knowledge-card-heading span:first-child {
+  color: var(--yuyu-ui-text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.ai-search-knowledge-card-heading strong {
+  color: var(--yuyu-ui-text-primary);
+  font-size: 12px;
+}
+
+.ai-search-knowledge-description,
+.ai-search-knowledge-error,
+.ai-search-knowledge-more p {
+  margin: 0;
+  color: var(--yuyu-ui-text-muted);
+  font-size: 10px;
+  line-height: 15px;
+}
+
+/* 「建立图片文字索引」确认弹窗的正文：侧栏卡片用的 10px 在弹窗里太挤，
+   这里单独给一档更大的字号，并保持与卡片一致的次要文字色。 */
+.ai-search-knowledge-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--yuyu-ui-text-muted);
+  font-size: 12px;
+  line-height: 19px;
+
+  p {
+    margin: 0;
+  }
+
+  strong {
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+}
+
+.ai-search-knowledge-error {
+  color: var(--yuyu-ui-warning);
+}
+
+.ai-search-sync-progress {
+  display: grid;
+  gap: 5px;
+}
+
+.ai-search-sync-progress-top {
+  color: var(--yuyu-ui-text-secondary);
+  font-size: 10px;
+}
+
+.ai-search-sync-progress-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--yuyu-ui-border);
+}
+
+.ai-search-sync-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--yuyu-ui-brand);
+  transition: width 250ms ease;
+}
+
+.ai-search-knowledge-card.building .ai-search-sync-progress-track span,
+.ai-search-knowledge-card.syncing .ai-search-sync-progress-track span {
+  animation: ai-search-sync-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ai-search-sync-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.ai-search-knowledge-details {
+  display: grid;
+  gap: 5px;
+  padding-top: 2px;
+}
+
+.ai-search-knowledge-details span {
+  color: var(--yuyu-ui-text-muted);
+  font-size: 10px;
+}
+
+.ai-search-knowledge-details strong {
+  color: var(--yuyu-ui-text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ai-search-knowledge-value--truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ACTION：主按钮吃满剩余宽度，取消按钮取自然宽且永不换行。 */
+.ai-search-knowledge-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+/*
+ * 图片文字索引卡片的操作区：每个按钮独占一行。
+ *
+ * 这张卡最多并列 3 个操作（更新图片文字索引 / 更多 / 继续或取消），
+ * 而上面那套两列栅格是按「1 主 + 1 次」设计的：`auto` 列不可收缩，
+ * 窄侧栏下第 2、3 个按钮会把卡片撑出横向溢出。
+ * 改成纵向堆叠后按钮宽度只跟随容器，结构上不可能溢出。
+ */
+.ai-search-knowledge-actions.ai-search-image-index-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/*
+ * 宽度严格跟随容器：`min-width: 0` 覆盖按钮自身的 68px 下限
+ * （单列下那个下限已经没有意义，反而会阻止收缩）。
+ * 标签最长 8 个汉字，最窄侧栏（190px）下仍有余量，所以保持单行不换行。
+ */
+.ai-search-knowledge-actions.ai-search-image-index-actions > * {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.ai-search-knowledge-primary {
+  min-width: 0;
+}
+
+.ai-search-knowledge-cancel {
+  min-width: 68px;
+  white-space: nowrap;
+}
+
+.ai-search-knowledge-more {
+  color: var(--yuyu-ui-text-secondary);
+  font-size: 10px;
+}
+
+.ai-search-knowledge-more summary {
+  cursor: pointer;
+  color: var(--yuyu-ui-brand);
+  font-weight: 700;
+}
+
+.ai-search-field-label {
+  display: block;
+  margin: 0 0 7px;
+  color: var(--yuyu-ui-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.ai-search-main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--yuyu-ui-bg-main);
+}
+
+.ai-search-main-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.ai-search-empty,
+.ai-search-loading,
+.ai-search-insufficient {
+  width: min(640px, calc(100% - 48px));
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  padding: 48px 24px;
+  flex-direction: column;
+  text-align: center;
+
+  h2 {
+    margin: 7px 0 8px;
+    color: var(--yuyu-ui-text-primary);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 26px;
+  }
+
+  p {
+    max-width: 440px;
+    margin: 0;
+    color: var(--yuyu-ui-text-secondary);
+    font-size: 12px;
+    line-height: 20px;
+  }
+}
+
+.ai-search-empty {
+  align-items: flex-start;
+  text-align: left;
+
+  > h2,
+  > p {
+    width: 100%;
+    max-width: 520px;
+  }
+}
+
+.ai-search-prompt-label {
+  margin-top: 28px;
+  color: var(--yuyu-ui-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.ai-search-prompts {
+  width: 100%;
+  max-width: 520px;
+  display: grid;
+  margin-top: 6px;
+  border-top: 1px solid hsl(var(--yuyu-border-subtle));
+
+  > * {
+    border-bottom: 1px solid hsl(var(--yuyu-border-subtle));
+  }
+}
+
+.ai-search-loading {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding-top: clamp(34px, 8vh, 88px);
+  text-align: left;
+
+  > h2,
+  > p {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.ai-search-pipeline {
+  width: 100%;
+  display: grid;
+  gap: 0;
+  margin-top: 24px;
+  border: 1px solid var(--yuyu-ui-border);
+  border-radius: var(--yuyu-ui-radius-md);
+  background: var(--yuyu-ui-bg-elevated);
+  overflow: hidden;
+}
+
+.ai-search-pipeline-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--yuyu-ui-border);
+  color: var(--yuyu-ui-text-muted);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  > div {
+    min-width: 0;
+  }
+
+  strong {
+    display: block;
+    color: var(--yuyu-ui-text-secondary);
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  p {
+    max-width: none;
+    margin-top: 2px;
+    color: var(--yuyu-ui-text-muted);
+    font-size: 11px;
+    line-height: 17px;
+  }
+
+  &.done strong {
+    color: var(--yuyu-ui-success);
+  }
+
+  &.active {
+    background: color-mix(in srgb, var(--yuyu-ui-brand-soft) 58%, transparent);
+
+    strong,
+    p {
+      color: var(--yuyu-ui-brand);
+    }
+  }
+
+  &.error {
+    background: color-mix(in srgb, var(--yuyu-ui-warning) 10%, var(--yuyu-ui-bg-elevated));
+
+    strong,
+    p {
+      color: var(--yuyu-ui-warning);
+    }
+  }
+}
+
+.ai-search-pipeline-mark {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+  border: 1px solid var(--yuyu-ui-border);
+  border-radius: 50%;
+  background: var(--yuyu-ui-bg-main);
+  color: var(--yuyu-ui-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ai-search-pipeline-step.done .ai-search-pipeline-mark {
+  border-color: color-mix(in srgb, var(--yuyu-ui-success) 45%, transparent);
+  background: color-mix(in srgb, var(--yuyu-ui-success) 11%, transparent);
+  color: var(--yuyu-ui-success);
+}
+
+.ai-search-pipeline-step.active .ai-search-pipeline-mark {
+  border-color: var(--yuyu-ui-brand);
+  color: var(--yuyu-ui-brand);
+  animation: ai-search-pipeline-pulse 1.2s ease-in-out infinite;
+}
+
+.ai-search-pipeline-step.error .ai-search-pipeline-mark {
+  border-color: var(--yuyu-ui-warning);
+  background: color-mix(in srgb, var(--yuyu-ui-warning) 12%, var(--yuyu-ui-bg-elevated));
+  color: var(--yuyu-ui-warning);
+}
+
+@keyframes ai-search-pipeline-pulse {
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--yuyu-ui-brand) 10%, transparent);
+  }
+}
+
+.ai-search-pipeline-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+
+  span {
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--yuyu-ui-bg-sidebar);
+    color: var(--yuyu-ui-text-secondary);
+    font-size: 10px;
+    line-height: 15px;
+  }
+}
+
+.ai-search-result {
+  width: min(820px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 28px 0 34px;
+}
+
+.ai-search-result-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--yuyu-ui-border);
+
+  h2 {
+    margin: 6px 0 5px;
+    color: var(--yuyu-ui-text-primary);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 26px;
+  }
+
+  p {
+    margin: 0;
+    color: var(--yuyu-ui-text-muted);
+    font-size: 11px;
+    line-height: 16px;
+  }
+}
+
+.ai-search-result-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.ai-search-summary-block {
+  margin-top: 22px;
+}
+
+.ai-search-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--yuyu-ui-text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.ai-search-section-heading > span {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--yuyu-ui-brand);
+}
+
+.ai-search-answer {
+  padding: 16px;
+  border-left: 3px solid var(--yuyu-ui-ai);
+  background: var(--yuyu-ui-ai-soft);
+  color: var(--yuyu-ui-text-primary);
+  font-size: 13px;
+  line-height: 22px;
+  white-space: pre-wrap;
+}
+
+.ai-search-streaming-answer {
+  width: 100%;
+}
+
+.ai-search-streaming-answer .ai-search-answer::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  background: var(--yuyu-ui-ai);
+  vertical-align: -0.12em;
+  animation: ai-search-stream-cursor 0.8s steps(2, start) infinite;
+}
+
+@keyframes ai-search-stream-cursor {
+  50% {
+    opacity: 0;
+  }
+}
+
+.ai-search-answer-evidence,
+.ai-search-trace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--yuyu-ui-text-muted);
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.ai-search-answer-evidence {
+  padding: 9px 12px;
+  border: 1px solid hsl(var(--yuyu-border-subtle));
+  border-top: 0;
+  background: var(--yuyu-ui-bg-elevated);
+}
+
+.ai-search-answer-evidence button {
+  padding: 2px 6px;
+  border: 1px solid var(--yuyu-ui-ai);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--yuyu-ui-ai);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.ai-search-submit-icon,
+.ai-search-evidence-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.ai-search-submit-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.ai-search-evidence-link-icon {
+  width: 13px;
+  height: 13px;
+  margin-left: 3px;
+}
+
+.ai-search-submit-icon svg,
+.ai-search-evidence-link-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.ai-search-inline-evidence {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  margin: 0 2px;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+  color: var(--primary-color);
+  font: inherit;
+  font-size: 0.85em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ai-search-inline-evidence:hover {
+  background: color-mix(in srgb, var(--primary-color) 18%, transparent);
+}
+
+.ai-search-trace {
+  margin-top: 9px;
+}
+
+.ai-search-trace span {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--yuyu-ui-bg-sidebar);
+}
+
+.ai-search-details {
+  margin-top: 12px;
+  color: var(--yuyu-ui-text-secondary);
+  font-size: 11px;
+
+  summary {
+    width: fit-content;
+    color: var(--yuyu-ui-brand);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary::after {
+    content: ' ▾';
+  }
+
+  &[open] summary::after {
+    content: ' ▴';
+  }
+}
+
+.ai-search-details-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px;
+  max-height: min(52vh, 480px);
+  margin-top: 10px;
+  padding: 1px 4px 4px 0;
+  overflow-y: auto;
+
+  section {
+    display: grid;
+    align-self: start;
+    min-width: 0;
+    max-height: 260px;
+    gap: 3px;
+    padding: 9px;
+    overflow-y: auto;
+    border: 1px solid var(--yuyu-ui-border);
+    border-radius: var(--yuyu-ui-radius-sm);
+    background: var(--yuyu-ui-bg-sidebar);
+  }
+
+  strong {
+    margin-bottom: 2px;
+    color: var(--yuyu-ui-text-primary);
+    font-size: 10px;
+  }
+
+  span {
+    color: var(--yuyu-ui-text-muted);
+    font-size: 10px;
+    line-height: 15px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
+.ai-search-details-trace {
+  max-height: 280px !important;
+  scrollbar-gutter: stable;
+}
+
+.ai-search-partial {
+  .ai-search-details {
+    width: 100%;
+    max-width: 640px;
+    margin-top: 18px;
+    text-align: left;
+  }
+}
+
+.ai-search-insufficient-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  background: #fff1df;
+  color: var(--yuyu-ui-warning);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.ai-search-evidence-focus-flash {
+  animation: ai-search-evidence-flash 0.72s ease-in-out 2;
+}
+
+@keyframes ai-search-evidence-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(36, 122, 99, 0);
+  }
+  50% {
+    border-color: var(--yuyu-ui-brand);
+    background: #e8f7f0;
+    box-shadow: 0 0 0 4px rgba(36, 122, 99, 0.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-search-result,
+  .ai-search-summary-block,
+  .ai-search-answer > *,
+  .ai-search-streaming-answer .ai-search-answer::after,
+  .ai-search-evidence-card,
+  .ai-search-history-popover,
+  .ai-search-evidence-focus-flash,
+  .ai-search-pipeline-step.active .ai-search-pipeline-mark,
+  .ai-search-sync-progress-track span {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.ai-search-voice-coverage-warning {
+  color: var(--yuyu-ui-brand);
+  font-size: 11px;
+  font-weight: 600;
+}
+@media (max-width: 1120px) {
+  .ai-search-workspace {
+    --ai-search-sidebar-width: 210px;
+    --ai-search-evidence-width: 282px;
+  }
+
+  .ai-search-grid {
+    grid-template-columns: minmax(190px, var(--ai-search-sidebar-width)) minmax(0, 1fr) minmax(
+        250px,
+        var(--ai-search-evidence-width)
+      );
+  }
+  .ai-search-header {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .ai-search-result {
+    width: calc(100% - 32px);
+  }
+}
+
+@media (max-height: 820px) {
+  .ai-search-scope-panel {
+    padding-top: 12px;
+  }
+
+  .ai-search-empty,
+  .ai-search-loading,
+  .ai-search-insufficient {
+    padding-top: 28px;
+    padding-bottom: 28px;
+  }
+
+  .ai-search-result {
+    padding-top: 20px;
+    padding-bottom: 24px;
+  }
+}
+
+.ai-search-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai-search-debug-panel {
+  flex: 0 0 auto;
+  padding: 10px 22px 12px;
+  border-bottom: 1px solid var(--yuyu-ui-border);
+  background: var(--yuyu-ui-bg-sidebar);
+}
+
+.ai-search-debug-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ai-search-debug-header > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.ai-search-debug-header strong {
+  color: var(--yuyu-ui-text-primary);
+  font-size: 12px;
+}
+
+.ai-search-debug-header span,
+.ai-search-debug-path {
+  color: var(--yuyu-ui-text-muted);
+  font-size: 10px;
+}
+
+.ai-search-debug-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ai-search-debug-path {
+  display: block;
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-search-debug-panel pre {
+  max-height: 130px;
+  margin: 8px 0 0;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid var(--yuyu-ui-border);
+  border-radius: var(--yuyu-ui-radius-sm);
+  background: var(--yuyu-ui-bg-elevated);
+  color: var(--yuyu-ui-text-secondary);
+  font:
+    10px/16px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ai-search-markdown-spacer {
+  height: 8px;
+}
+
+.ai-search-answer p {
+  margin: 0;
+}
+
+.ai-search-answer h1,
+.ai-search-answer h2,
+.ai-search-answer h3 {
+  margin: 0 0 8px;
+  color: var(--yuyu-ui-text-primary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.ai-search-answer h2 {
+  font-size: 15px;
+}
+
+.ai-search-answer code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(65, 84, 76, 0.1);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.ai-search-markdown-list-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 4px;
+  margin: 3px 0;
+}
+
+.ai-search-markdown-list-item > span:first-child {
+  color: var(--yuyu-ui-brand);
+  font-weight: 700;
+}
+
+/*
+ * Markdown 表格的降级渲染。
+ *
+ * 结果栏很窄，真表格塞进来只会列宽错位、长字段换行难读。渲染层把表格行转成
+ * 逐行的键值列表（见 searchMarkdown.tsx），这里只保证两件事：
+ * 读得出来，且**永远不会横向溢出容器**。所以用 flex + wrap，不用 table。
+ */
+.ai-search-markdown-table-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 3px 0;
+  min-width: 0;
+}
+
+.ai-search-markdown-table-cell {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--yuyu-ui-text-secondary);
+}
+
+.ai-search-markdown-table-cell:first-child {
+  color: var(--yuyu-ui-text-primary);
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .ai-search-header-actions {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 6px;
+  }
+}

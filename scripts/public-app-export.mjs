@@ -74,6 +74,13 @@ export async function auditPublicExport(source, manifest) {
       fail(`Credential-like content: ${item.path}`)
     if (/(?:\/Users\/[^/\s]+\/|[A-Z]:\\Users\\[^\\\s]+\\)/.test(text))
       fail(`Local personal path in public file: ${item.path}`)
+    if (
+      item.path.startsWith('src/') &&
+      /(?:Memory\.alloc\s*\(|new NativeFunction\s*\(|Interceptor\.attach\s*\(|createDecipheriv\s*\(|NATIVE_MODULE_TOOL_REGISTRY)/.test(
+        text
+      )
+    )
+      fail(`Private implementation in public source: ${item.path}`)
     approved.set(item.path, { bytes, text, mode: stat.mode & 0o111 ? 0o755 : 0o644 })
   }
   for (const [name, { text }] of approved) {

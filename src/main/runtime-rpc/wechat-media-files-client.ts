@@ -5,6 +5,9 @@ import { z } from 'zod'
 import { RuntimeRpcError, type RuntimeJson } from '../../shared/runtime-rpc'
 import { wechatStorageDescriptionSchema } from '../../shared/wechat-storage-protocol'
 import {
+  mediaAssetQuerySchema,
+  mediaAssetSchema,
+  type MediaAssetQuery,
   mediaChunkBytes,
   mediaDecodeBytes,
   mediaTransferBytes,
@@ -84,6 +87,37 @@ export class WechatMediaFilesClient {
   private params(input: Record<string, unknown> = {}): RuntimeJson {
     if (!this.session || this.closing) throw new RuntimeRpcError('MEDIA_SESSION_CLOSED')
     return JSON.parse(JSON.stringify({ ...input, sessionId: this.session })) as RuntimeJson
+  }
+  locateAsset(query: MediaAssetQuery) {
+    const parsed = check(mediaAssetQuerySchema, query, 'INVALID_ARGUMENT')
+    this.require('media.locateAsset')
+    return check(
+      mediaAssetSchema.nullable(),
+      this.rpc.call('media.locateAsset', this.params({ query: parsed }))
+    )
+  }
+  async readFileAsync(path: string, maximum: number, signal?: AbortSignal): Promise<Buffer> {
+    if (!Number.isSafeInteger(maximum) || maximum <= 0 || maximum > mediaDecodeBytes)
+      throw new RuntimeRpcError('INVALID_ARGUMENT')
+    let data: Buffer | undefined
+    let offset = 0
+    try {
+      await this.consume(
+        path,
+        false,
+        async (chunk, info) => {
+          if (info.size > maximum) throw new RuntimeRpcError('MEDIA_SIZE_LIMIT')
+          data ??= Buffer.alloc(info.size)
+          chunk.copy(data, offset)
+          offset += chunk.length
+        },
+        signal
+      )
+      return data ?? Buffer.alloc(0)
+    } catch (error) {
+      data?.fill(0)
+      throw error
+    }
   }
   find(query: MediaFindQuery): string | null {
     const parsed = check(mediaFindQuerySchema, query, 'INVALID_ARGUMENT')

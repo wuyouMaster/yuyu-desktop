@@ -1,0 +1,241 @@
+import type { ParsedContent } from './types'
+
+function xmlValue(xml: string, tag: string): string | undefined {
+  const match = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(xml)
+  const raw = match?.[1]?.replace(/^<!\[CDATA\[([\s\S]*?)\]\]>$/, '$1').trim()
+  return raw || undefined
+}
+
+function decodeXmlEntities(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+}
+
+/**
+ * 解析 `fav_db_item.content` 的 `<favitem>` XML → `FavoriteRecord`（只读）。
+ * 覆盖真机 2026-09-24 样本形态：desc/title/link/locitem/dataitem/appbranditem/finderFeed。
+ */
+export function parseFavItemXml(content: string | null | undefined): FavoriteRecord {
+  const xml = String(content || '')
+  const typeMatch = /<favitem[^>]*\stype="(\d+)"/i.exec(xml)
+  const type = typeMatch?.[1]
+  const title = decodeXmlEntities(xmlValue(xml, 'title') || '')
+  const desc = decodeXmlEntities(xmlValue(xml, 'desc') || xmlValue(xml, 'datadesc') || '')
+  const datatitle = decodeXmlEntities(xmlValue(xml, 'datatitle') || '')
+  const link = decodeXmlEntities(xmlValue(xml, 'link') || xmlValue(xml, 'datacdnurl') || '')
+  const poiname = decodeXmlEntities(xmlValue(xml, 'poiname') || '')
+  const label = decodeXmlEntities(xmlValue(xml, 'label') || '')
+  const lat = Number(xmlValue(xml, 'lat'))
+  const lng = Number(xmlValue(xml, 'lng'))
+  const dataid = xmlValue(xml, 'dataid')
+  const datatype = xmlValue(xml, 'datatype')
+  const duration = Number(xmlValue(xml, 'duration') || xmlValue(xml, 'voicelength'))
+  const appname =
+    decodeXmlEntities(
+      xmlValue(xml, 'appbrandnick') ||
+        xmlValue(xml, 'appname') ||
+        xmlValue(xml, 'sourcedisplayname') ||
+        ''
+    ) || undefined
+  return {
+    type,
+    dataType: datatype,
+    title: title || datatitle || undefined,
+    description: desc || undefined,
+    url: link || undefined,
+    appName: appname,
+    poiname: poiname || undefined,
+    label: label || undefined,
+    lat: Number.isFinite(lat) ? lat : undefined,
+    lng: Number.isFinite(lng) ? lng : undefined,
+    md5: dataid,
+    duration: Number.isFinite(duration) && duration > 0 ? duration : undefined,
+    raw: xml
+  }
+}
+
+/** `fav_db_item` 行 → 可读卡片（导出/搜索共用）。 */
+export function favoriteRowToContent(row: {
+  local_id?: number | string
+  server_id?: number | string
+  type?: number | string
+  content?: string | null
+  update_time?: number | string
+  fromusr?: string | null
+  realchatname?: string | null
+}): ParsedContent {
+  const record = parseFavItemXml(row.content)
+  if (!record.type && row.type !== undefined) record.type = row.type
+  record.favId = row.local_id ?? row.server_id
+  return favoriteRecordToContent(record)
+}
+
+/**
+ * 收藏类型（`MM_FAV_ITEM_TYPE_*` / `MM_FAV_DATA_TYPE_*`）只读映射。
+ * 名称来自 wechat.dylib 导出名；数字为枚举顺序推断，未知值原样回退。
+ */
+
+const FAV_TYPE_TEXT: Record<string, string> = {
+  all: '全部',
+  none: '未知收藏',
+  txt: '文字',
+  '1': '文字',
+  img: '图片',
+  '2': '图片',
+  voice: '语音',
+  chatvoice: '语音',
+  '3': '语音',
+  video: '视频',
+  '4': '视频',
+  webpage: '网页',
+  '5': '网页',
+  loc: '位置',
+  location: '位置',
+  '6': '位置',
+  music: '音乐',
+  '7': '音乐',
+  file: '文件',
+  '8': '文件',
+  // 真机 fav_db_item.type（2026-09-24 直方图）：
+  record: '聊天记录',
+  embeded_record: '聊天记录',
+  '14': '聊天记录',
+  sight: '小视频/名片',
+  sharecard: '名片',
+  '16': '小视频/名片',
+  note: '笔记/图文',
+  '18': '笔记/图文',
+  weapp: '小程序',
+  liteapp: '小程序',
+  '19': '小程序',
+  finder: '视频号',
+  finder_feed: '视频号',
+  finder_live: '视频号直播',
+  finder_video: '视频号',
+  finder_name_card: '视频号名片',
+  '20': '视频号',
+  finder_shop_window_shared: '商品橱窗',
+  music_mv: '音乐视频',
+  ting: '听一听',
+  ting_list: '听一听',
+  collection: '合集',
+  openimkf_sharecard: '客服名片'
+}
+
+/** `MM_FAV_*` → 展示文案（未知原样返回）。 */
+export function describeFavoriteType(raw?: string | number): string | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined
+  const key = String(raw).trim().toLowerCase()
+  if (!key) return undefined
+  return FAV_TYPE_TEXT[key] || String(raw).trim()
+}
+
+/** 收藏记录（只读展示字段；与 favorite.db 列名对齐时可再扩）。 */
+export type FavoriteRecord = {
+  favId?: string | number
+  /** `MM_FAV_ITEM_TYPE_*` 或 `MM_FAV_DATA_TYPE_*`。 */
+  type?: string | number
+  dataType?: string | number
+  title?: string
+  description?: string
+  url?: string
+  appName?: string
+  poiname?: string
+  label?: string
+  lat?: number
+  lng?: number
+  md5?: string
+  datName?: string
+  duration?: number
+  width?: number
+  height?: number
+  raw?: string
+}
+
+/**
+ * 把收藏记录收成现有 `ParsedContent` 形态，复用聊天卡片/导出。
+ * 不做支付、不生成可点开资金动作。
+ */
+export function favoriteRecordToContent(record: FavoriteRecord): ParsedContent {
+  const rawType = record.dataType ?? record.type
+  const key = String(rawType ?? '').trim().toLowerCase()
+  const label = describeFavoriteType(rawType) || '收藏'
+  const title = record.title || label
+  const description = record.description
+
+  if (key === 'txt' || key === 'text' || key === '1') {
+    return { type: 'text', content: description || record.raw || title }
+  }
+  if (key === 'img' || key === 'image' || key === '2') {
+    return {
+      type: 'image',
+      md5: record.md5,
+      datName: record.datName
+    }
+  }
+  if (key === 'voice' || key === 'chatvoice' || key === '3') {
+    return { type: 'voice', duration: record.duration }
+  }
+  if (
+    key === 'video' ||
+    key === 'sight' ||
+    key === 'tv' ||
+    key === 'music_mv' ||
+    key === '4' ||
+    key === '16'
+  ) {
+    return {
+      type: 'video',
+      md5: record.md5,
+      duration: record.duration,
+      width: record.width,
+      height: record.height
+    }
+  }
+  if (key === 'loc' || key === 'location' || key === '6') {
+    return {
+      type: 'location',
+      poiname: record.poiname || title,
+      label: record.label || description,
+      lat: record.lat ?? 0,
+      lng: record.lng ?? 0
+    }
+  }
+  if (key === 'weapp' || key === 'liteapp' || key === '19') {
+    return {
+      type: 'miniProgram',
+      title,
+      description,
+      appName: record.appName || '小程序'
+    }
+  }
+  if (key === 'record' || key === 'embeded_record' || key === '14') {
+    return {
+      type: 'forwardBundle',
+      title: title || '聊天记录',
+      description,
+      items: []
+    }
+  }
+  if (key === 'none' || key === '' || key === 'all') {
+    return {
+      type: 'system',
+      content: `收藏 · ${label}`,
+      raw: record.raw
+    }
+  }
+
+  // 网页 / 音乐 / 文件 / 商品 / 视频号 / 笔记 / 名片 / 合集 → 只读 share
+  return {
+    type: 'share',
+    title,
+    des: description,
+    url: record.url || '',
+    appname: record.appName || label,
+    typeVal: key || 'favorite'
+  }
+}

@@ -1,0 +1,39 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="brand-dark-bg" x1="28" y1="24" x2="228" y2="238" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B0F17" />
+      <stop offset="0.52" stop-color="#111827" />
+      <stop offset="1" stop-color="#17152E" />
+    </linearGradient>
+    <radialGradient id="brand-dark-halo" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(172 72) rotate(132) scale(154)">
+      <stop stop-color="#6326C9" stop-opacity="0.34" />
+      <stop offset="0.58" stop-color="#312E81" stop-opacity="0.12" />
+      <stop offset="1" stop-color="#0B0F17" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="brand-dark-ribbon" x1="47" y1="89" x2="216" y2="176" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFAA4A" />
+      <stop offset="0.34" stop-color="#FF4561" />
+      <stop offset="0.64" stop-color="#FF20C4" />
+      <stop offset="1" stop-color="#7B35FF" />
+    </linearGradient>
+    <filter id="brand-dark-glow" x="20" y="35" width="216" height="188" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="9" />
+    </filter>
+    <path id="brand-dark-left-ribbon" d="M62 177V111C62 78 88 61 113 70C127 75 136 87 141 101" />
+    <path id="brand-dark-right-ribbon" d="M128 177V111C128 78 154 61 179 70C193 75 202 87 207 101V177" />
+  </defs>
+
+  <rect x="8" y="8" width="240" height="240" rx="54" fill="url(#brand-dark-bg)" />
+  <rect x="8" y="8" width="240" height="240" rx="54" fill="url(#brand-dark-halo)" />
+  <rect x="8.5" y="8.5" width="239" height="239" rx="53.5" stroke="#475569" stroke-opacity="0.44" />
+  <rect x="18" y="18" width="220" height="220" rx="45" stroke="#FFFFFF" stroke-opacity="0.05" />
+
+  <g opacity="0.5" filter="url(#brand-dark-glow)" stroke="url(#brand-dark-ribbon)" stroke-width="39" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#brand-dark-left-ribbon" />
+    <use href="#brand-dark-right-ribbon" />
+  </g>
+  <g stroke="url(#brand-dark-ribbon)" stroke-width="39" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#brand-dark-left-ribbon" />
+    <use href="#brand-dark-right-ribbon" />
+  </g>
+</svg>

@@ -1,0 +1,1726 @@
+@mixin dark-content-theme {
+  --yuyu-ui-bg-app: #08090d;
+  --yuyu-ui-bg-main: #0d0f14;
+  --yuyu-ui-bg-sidebar: #11141a;
+  --yuyu-ui-bg-elevated: #161a22;
+  --yuyu-ui-text-primary: #f3f4f6;
+  --yuyu-ui-text-secondary: #9ca3af;
+  --yuyu-ui-text-muted: #6b7280;
+  --yuyu-ui-border: rgba(255, 255, 255, 0.08);
+  --yuyu-ui-brand: #3b82f6;
+  --yuyu-ui-brand-hover: #60a5fa;
+  --yuyu-ui-brand-soft: rgba(59, 130, 246, 0.15);
+  --yuyu-ui-selection-soft: rgba(59, 130, 246, 0.18);
+  --yuyu-ui-ai: #38bdf8;
+  --yuyu-ui-ai-soft: rgba(56, 189, 248, 0.14);
+  --yuyu-ui-success: #34d399;
+  --yuyu-ui-warning: #fbbf24;
+  --yuyu-ui-danger: #f87171;
+  --yuyu-ui-glass-canvas: linear-gradient(180deg, #0c0e14 0%, #08090d 100%);
+  --yuyu-ui-glass-primary: rgba(22, 26, 34, 0.82);
+  --yuyu-ui-glass-elevated: rgba(30, 36, 48, 0.92);
+  --yuyu-ui-glass-subtle: rgba(17, 20, 26, 0.85);
+  --yuyu-ui-glass-sidebar: #11141a;
+  --yuyu-ui-glass-rail: #090b0f;
+  --yuyu-ui-glass-message: #1a1f2a;
+  --yuyu-ui-glass-control: rgba(255, 255, 255, 0.04);
+  --yuyu-ui-glass-control-hover: rgba(255, 255, 255, 0.08);
+  --yuyu-ui-glass-popover: rgba(30, 36, 48, 0.95);
+  --yuyu-ui-glass-border: rgba(255, 255, 255, 0.08);
+  --yuyu-ui-glass-border-highlight: rgba(255, 255, 255, 0.12);
+  --yuyu-ui-shadow-glass: 0 18px 48px rgba(0, 0, 0, 0.28);
+  --yuyu-ui-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0, 0, 0.2);
+  --yuyu-ui-shadow-popover: 0 14px 34px rgba(0, 0, 0, 0.38);
+  --yuyu-ui-shadow-control-inset: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  --yuyu-ui-shadow-terminal-inset: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  --yuyu-ui-glass-terminal: #12151c;
+  --yuyu-ui-glass-chat-list: #0d0f14;
+  --yuyu-ui-log-hover: rgba(255, 255, 255, 0.04);
+  --yuyu-ui-chart-trend: #38bdf8;
+  --yuyu-ui-chart-text: #7f9bff;
+  --yuyu-ui-chart-image: #34d399;
+  --yuyu-ui-chart-video: #fbbf24;
+  --yuyu-ui-chart-link: #f87171;
+  --yuyu-ui-chart-sticker: #a78bfa;
+  --yuyu-ui-chart-other: #60a5fa;
+  --yuyu-ui-chart-voice: #38bdf8;
+  --yuyu-ui-chart-file: #f472b6;
+
+  .conversation-section-header:hover,
+  .conversation-item:hover,
+  .report-source-item:hover,
+  .report-history-item:hover {
+    background: var(--yuyu-ui-glass-hover);
+  }
+
+  .chat-window,
+  .chat-archive-header,
+  .chat-status-bar,
+  .ai-report-workspace,
+  .ai-report-footer,
+  .report-viewer,
+  .settings-workspace,
+  .settings-page-header,
+  .api-center-layout,
+  .export-workspace,
+  .ai-search-workspace {
+    background: var(--yuyu-ui-bg-main);
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  .data-trust-bar {
+    background: var(--yuyu-ui-bg-sidebar);
+  }
+
+  .wechat-message-list {
+    background: var(--yuyu-ui-bg-main);
+  }
+
+  .message-bubble,
+  .wechat-message-row.other .quoted-message,
+  .message-loading-pill {
+    border-color: var(--yuyu-ui-border);
+    background: var(--yuyu-ui-glass-message);
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  .wechat-system-message {
+    background: var(--yuyu-ui-glass-elevated);
+    color: var(--yuyu-ui-text-secondary);
+  }
+
+  .message-sender-name,
+  .message-hover-time,
+  .message-accessible-sender {
+    color: var(--yuyu-ui-text-muted);
+  }
+
+  .wechat-message-row.mine .message-bubble {
+    border-color: color-mix(in srgb, var(--yuyu-ui-success) 30%, transparent);
+    background: color-mix(in srgb, var(--yuyu-ui-success) 18%, var(--yuyu-ui-glass-elevated));
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  .wechat-message-row.mine .quoted-message {
+    background: color-mix(in srgb, var(--yuyu-ui-bg-app) 40%, transparent);
+    color: var(--yuyu-ui-text-secondary);
+  }
+
+  .message-bubble a,
+  .message-bubble code,
+  .message-bubble pre {
+    color: inherit;
+  }
+
+  .settings-sidebar,
+  .settings-sidebar-account,
+  .report-source-sidebar,
+  .report-history-sidebar {
+    background: var(--yuyu-ui-bg-sidebar);
+    border-color: var(--yuyu-ui-border);
+  }
+
+  .settings-sidebar header,
+  .settings-page-header,
+  .report-source-header,
+  .report-history-header,
+  .report-settings-panel header,
+  .report-viewer-header {
+    border-color: var(--yuyu-ui-border);
+  }
+
+  .settings-sidebar header h1,
+  .settings-sidebar-list button,
+  .settings-sidebar-list button.active,
+  .settings-page-header h1,
+  .settings-section-heading,
+  .settings-card,
+  .settings-card strong,
+  .settings-cache-item h3,
+  .settings-toggle-row b,
+  .settings-choice b,
+  .settings-workspace h1,
+  .settings-workspace h2,
+  .settings-workspace h3,
+  .settings-workspace h4,
+  .settings-workspace strong,
+  .settings-workspace b,
+  .settings-workspace button,
+  .settings-workspace label,
+  .settings-workspace dt,
+  .settings-workspace dd,
+  .settings-workspace span,
+  .settings-workspace p,
+  .settings-workspace small,
+  .settings-workspace code,
+  .settings-workspace a {
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  .settings-workspace p,
+  .settings-workspace small,
+  .settings-workspace span,
+  .settings-workspace code,
+  .settings-workspace .settings-inline-note,
+  .settings-workspace .settings-footnote {
+    color: var(--yuyu-ui-text-secondary);
+  }
+
+  .settings-workspace .settings-card,
+  .settings-workspace .settings-choice,
+  .settings-workspace .settings-search,
+  .settings-workspace input,
+  .settings-workspace textarea,
+  .settings-workspace select {
+    border-color: var(--yuyu-ui-border);
+    background: var(--yuyu-ui-bg-elevated);
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  .settings-workspace input,
+  .settings-workspace textarea,
+  .settings-workspace select {
+    background: var(--yuyu-ui-glass-control);
+  }
+
+  .settings-workspace input::placeholder,
+  .settings-workspace textarea::placeholder {
+    color: var(--yuyu-ui-text-muted);
+  }
+
+  .settings-workspace .settings-choice.active,
+  .settings-workspace .settings-status-badge,
+  .settings-workspace .settings-privacy-notice,
+  .settings-workspace .settings-inline-note {
+    background: var(--yuyu-ui-brand-soft);
+  }
+
+  .settings-workspace .settings-privacy-notice,
+  .settings-workspace .settings-privacy-notice strong,
+  .settings-workspace .settings-privacy-notice p,
+  .settings-workspace .settings-privacy-notice svg {
+    color: var(--yuyu-ui-text-secondary);
+    stroke: var(--yuyu-ui-success);
+  }
+
+  .settings-workspace .database-key-security-info {
+    border-color: var(--yuyu-ui-glass-border);
+    background: var(--yuyu-ui-glass-border);
+  }
+
+  .settings-workspace .database-key-security-info span,
+  .settings-workspace .database-key-diagnostics,
+  .settings-workspace .database-key-connection-actions > div {
+    border-color: var(--yuyu-ui-border);
+    background: var(--yuyu-ui-bg-elevated);
+  }
+
+  .settings-workspace .database-key-danger > div {
+    border-color: color-mix(in srgb, var(--yuyu-ui-danger) 32%, var(--yuyu-ui-border));
+    background: color-mix(in srgb, var(--yuyu-ui-danger) 10%, var(--yuyu-ui-bg-elevated));
+  }
+
+  .settings-workspace .database-key-security-info strong,
+  .settings-workspace .database-key-connection-actions strong,
+  .settings-workspace .database-key-danger strong {
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  .settings-workspace .database-key-security-info span,
+  .settings-workspace .database-key-connection-actions small,
+  .settings-workspace .database-key-danger small,
+  .settings-workspace .database-key-diagnostics summary {
+    color: var(--yuyu-ui-text-secondary);
+  }
+
+  .settings-workspace .image-resource-checks > div {
+    border-color: var(--yuyu-ui-border);
+  }
+
+  .settings-workspace .image-resource-icon {
+    background: var(--yuyu-ui-bg-sidebar);
+    color: var(--yuyu-ui-text-muted);
+  }
+
+  .settings-workspace .image-resource-icon.available {
+    background: color-mix(in srgb, var(--yuyu-ui-success) 18%, var(--yuyu-ui-bg-elevated));
+    color: var(--yuyu-ui-success);
+  }
+
+  .settings-workspace .image-resource-icon.unavailable {
+    background: color-mix(in srgb, var(--yuyu-ui-danger) 16%, var(--yuyu-ui-bg-elevated));
+    color: var(--yuyu-ui-danger);
+  }
+
+  .settings-workspace .settings-connection-text.success,
+  .settings-workspace [class*='success'],
+  .settings-workspace [class*='success'] * {
+    color: var(--yuyu-ui-success) !important;
+  }
+
+  .settings-workspace [class*='error'],
+  .settings-workspace [class*='error'] * {
+    color: var(--yuyu-ui-danger) !important;
+  }
+
+  .report-settings-panel {
+    background: var(--yuyu-ui-bg-sidebar);
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  .report-settings-section,
+  .report-settings-section h3,
+  .report-settings-section p,
+  .report-settings-section code,
+  .report-export-list div,
+  .report-generation-log li,
+  .report-generation-log b,
+  .report-generation-log small,
+  .report-info-panel {
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  .report-settings-section p,
+  .report-settings-section code,
+  .report-export-list div,
+  .report-generation-log li,
+  .report-generation-log small {
+    color: var(--yuyu-ui-text-secondary);
+  }
+
+  .report-settings-section code,
+  .report-timeout-section input,
+  .report-check-row,
+  .report-readonly-modules span,
+  .report-result-preview {
+    border-color: var(--yuyu-ui-border);
+    background: var(--yuyu-ui-bg-elevated);
+    color: var(--yuyu-ui-text-primary);
+  }
+
+
+  .report-history-item,
+  .report-source-item,
+  .report-history-text b,
+  .report-history-text small,
+  .report-history-text em {
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  .report-history-text small,
+  .report-history-text em,
+  .report-history-list-title,
+  .report-history-group h3 {
+    color: var(--yuyu-ui-text-muted);
+  }
+
+  .search-workspace,
+  .ai-search-scope-panel,
+  .ai-search-main,
+  .export-config-panel,
+  .api-main,
+  .api-runtime-panel {
+    background: var(--yuyu-ui-bg-main);
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  .ai-search-scope-panel,
+  .export-config-panel,
+  .api-runtime-panel {
+    border-color: var(--yuyu-ui-border);
+  }
+
+  .agent-hub-log-body {
+    border-color: var(--yuyu-ui-glass-border);
+    background: var(--yuyu-ui-glass-terminal);
+    color: var(--yuyu-ui-text-primary);
+    box-shadow: var(--yuyu-ui-shadow-terminal-inset);
+  }
+
+  .agent-hub-log-line:hover {
+    background: var(--yuyu-ui-log-hover);
+  }
+
+  .agent-hub-log-line time {
+    color: var(--yuyu-ui-text-muted);
+  }
+
+  .agent-hub-log-line .source {
+    background: var(--yuyu-ui-source-agent-bg);
+    color: var(--yuyu-ui-source-agent-text);
+  }
+
+  .agent-hub-log-line .source.wechat-connector {
+    background: var(--yuyu-ui-source-connector-bg);
+    color: var(--yuyu-ui-source-connector-text);
+  }
+
+  .agent-hub-log-line .source.system {
+    background: var(--yuyu-ui-source-system-bg);
+    color: var(--yuyu-ui-source-system-text);
+  }
+
+  .agent-hub-log-line.warn {
+    background: var(--yuyu-ui-status-warning-bg);
+  }
+
+  .agent-hub-log-line.warn code {
+    color: var(--yuyu-ui-status-warning-text);
+  }
+
+  .agent-hub-log-line.error {
+    background: var(--yuyu-ui-status-error-bg);
+  }
+
+  .agent-hub-log-line.error code {
+    color: var(--yuyu-ui-status-error-text);
+  }
+}
+
+// Global macOS glass layer. This file is intentionally loaded last so the
+// existing page-specific rules keep their layout while sharing one visual
+// language across every private-app workspace.
+@mixin light-glass-theme {
+  --yuyu-background: 219 65% 94%;
+  --yuyu-canvas: 219 65% 96%;
+  --yuyu-foreground: 222 43% 17%;
+  --yuyu-surface: 0 0% 100%;
+  --yuyu-surface-muted: 220 45% 94%;
+  --yuyu-surface-elevated: 0 0% 100%;
+  --yuyu-border: 218 42% 78%;
+  --yuyu-border-subtle: 218 48% 86%;
+  --yuyu-primary: 221 100% 62%;
+  --yuyu-primary-hover: 221 83% 55%;
+  --yuyu-primary-foreground: 0 0% 100%;
+  --yuyu-secondary: 220 46% 94%;
+  --yuyu-secondary-foreground: 222 43% 17%;
+  --yuyu-muted: 220 44% 92%;
+  --yuyu-muted-foreground: 218 25% 43%;
+  --yuyu-subtle-foreground: 218 24% 57%;
+  --yuyu-accent: 221 100% 95%;
+  --yuyu-accent-foreground: 221 100% 45%;
+  --yuyu-ai: 231 74% 61%;
+  --yuyu-ai-soft: 231 80% 95%;
+  --yuyu-success: 153 69% 43%;
+  --yuyu-warning: 37 88% 57%;
+  --yuyu-destructive: 4 81% 66%;
+  --yuyu-destructive-foreground: 0 0% 100%;
+  --yuyu-focus-ring: 218 100% 62%;
+  --yuyu-ui-bg-app: #edf3ff;
+  --yuyu-ui-bg-main: rgba(255, 255, 255, 0.38);
+  --yuyu-ui-bg-sidebar: rgba(255, 255, 255, 0.46);
+  --yuyu-ui-bg-elevated: rgba(255, 255, 255, 0.84);
+  --yuyu-ui-text-primary: #17233f;
+  --yuyu-ui-text-secondary: #60708d;
+  --yuyu-ui-text-muted: #8d9ab2;
+  --yuyu-ui-text-accent: #168f9b;
+  --yuyu-ui-border: rgba(185, 202, 226, 0.48);
+  --yuyu-ui-brand: #3e7cff;
+  --yuyu-ui-brand-hover: #2f6de8;
+  --yuyu-ui-brand-soft: rgba(62, 124, 255, 0.12);
+  --yuyu-ui-selection-soft: rgba(62, 124, 255, 0.14);
+  --yuyu-ui-ai: #4e63e8;
+  --yuyu-ui-ai-soft: rgba(78, 99, 232, 0.1);
+  --yuyu-ui-success: #22b978;
+  --yuyu-ui-warning: #f4b44b;
+  --yuyu-ui-danger: #f06b63;
+  --yuyu-ui-glass-canvas: linear-gradient(135deg, #eaf1ff 0%, #f4f0ff 50%, #edf7ff 100%);
+  --yuyu-ui-glass-primary: rgba(255, 255, 255, 0.72);
+  --yuyu-ui-glass-elevated: rgba(255, 255, 255, 0.84);
+  --yuyu-ui-glass-subtle: rgba(255, 255, 255, 0.54);
+  --yuyu-ui-glass-sidebar: rgba(255, 255, 255, 0.54);
+  --yuyu-ui-glass-rail: rgba(255, 255, 255, 0.54);
+  --yuyu-ui-glass-message: rgba(255, 255, 255, 0.84);
+  --yuyu-ui-glass-popover: rgba(255, 255, 255, 0.92);
+  --yuyu-ui-glass-border: rgba(185, 202, 226, 0.48);
+  --yuyu-ui-glass-border-highlight: rgba(255, 255, 255, 0.72);
+  --yuyu-ui-glass-header: rgba(255, 255, 255, 0.16);
+  --yuyu-ui-glass-hover: rgba(255, 255, 255, 0.56);
+  --yuyu-ui-glass-control: rgba(255, 255, 255, 0.48);
+  --yuyu-ui-glass-control-hover: rgba(255, 255, 255, 0.75);
+  --yuyu-ui-glass-control-strong: rgba(255, 255, 255, 0.68);
+  --yuyu-ui-glass-control-muted: rgba(255, 255, 255, 0.42);
+  --yuyu-ui-glass-disabled: rgba(255, 255, 255, 0.45);
+  --yuyu-ui-glass-table-header: rgba(255, 255, 255, 0.26);
+  --yuyu-ui-glass-terminal: rgba(255, 255, 255, 0.52);
+  --yuyu-ui-glass-chat-list: rgba(238, 244, 255, 0.34);
+  --yuyu-ui-overlay: rgba(36, 53, 86, 0.2);
+  --yuyu-ui-code-bg: rgba(102, 123, 165, 0.1);
+  --yuyu-ui-shadow-glass: 0 18px 48px rgba(57, 80, 125, 0.12);
+  --yuyu-ui-shadow-card: 0 12px 32px rgba(65, 87, 125, 0.08), 0 2px 8px rgba(65, 87, 125, 0.05);
+  --yuyu-ui-shadow-popover: 0 14px 34px rgba(57, 80, 125, 0.16);
+  --yuyu-ui-chart-trend: #18afc0;
+  --yuyu-ui-chart-text: #4e7dff;
+  --yuyu-ui-chart-image: #23b7a3;
+  --yuyu-ui-chart-video: #f4b44b;
+  --yuyu-ui-chart-link: #f06b63;
+  --yuyu-ui-chart-sticker: #8c6ae8;
+  --yuyu-ui-chart-other: #72a9e8;
+  --yuyu-ui-chart-voice: #36a6d8;
+  --yuyu-ui-chart-file: #d183b4;
+  --yuyu-ui-log-hover: rgba(62, 124, 255, 0.06);
+  --yuyu-ui-source-agent-bg: rgba(13, 148, 136, 0.12);
+  --yuyu-ui-source-agent-text: #0f766e;
+  --yuyu-ui-source-connector-bg: rgba(62, 124, 255, 0.12);
+  --yuyu-ui-source-connector-text: #2563eb;
+  --yuyu-ui-source-system-bg: rgba(245, 158, 11, 0.14);
+  --yuyu-ui-source-system-text: #b45309;
+  --yuyu-ui-status-warning-bg: rgba(245, 158, 11, 0.1);
+  --yuyu-ui-status-warning-text: #b45309;
+  --yuyu-ui-status-error-bg: rgba(239, 68, 68, 0.1);
+  --yuyu-ui-status-error-text: #dc2626;
+  --yuyu-ui-danger-border: rgba(240, 107, 99, 0.2);
+  --yuyu-ui-danger-soft: rgba(240, 107, 99, 0.1);
+  --yuyu-ui-shadow-terminal-inset: inset 0 1px 3px rgba(65, 87, 125, 0.04);
+  --yuyu-ui-shadow-control-inset: inset 0 1px 2px rgba(65, 87, 125, 0.04);
+  --yuyu-ui-shadow-control: 0 4px 12px rgba(65, 87, 125, 0.08);
+  --yuyu-ui-overlay: rgba(36, 53, 86, 0.2);
+  --yuyu-ui-selection: rgba(62, 124, 255, 0.22);
+  --yuyu-ui-scrollbar: rgba(126, 148, 190, 0.3);
+  --yuyu-ui-scrollbar-hover: rgba(126, 148, 190, 0.48);
+}
+
+@mixin dark-glass-theme {
+  --yuyu-background: 225 29% 5%;
+  --yuyu-canvas: 225 21% 6%;
+  --yuyu-foreground: 220 14% 96%;
+  --yuyu-surface: 221 22% 10%;
+  --yuyu-surface-muted: 222 21% 9%;
+  --yuyu-surface-elevated: 220 21% 11%;
+  --yuyu-border: 0 0% 100% / 0.08;
+  --yuyu-border-subtle: 0 0% 100% / 0.06;
+  --yuyu-primary: 217 91% 60%;
+  --yuyu-primary-hover: 213 97% 68%;
+  --yuyu-primary-foreground: 0 0% 100%;
+  --yuyu-secondary: 220 21% 11%;
+  --yuyu-secondary-foreground: 220 14% 96%;
+  --yuyu-muted: 220 21% 11%;
+  --yuyu-muted-foreground: 218 11% 65%;
+  --yuyu-subtle-foreground: 220 9% 46%;
+  --yuyu-accent: 217 91% 60% / 0.15;
+  --yuyu-accent-foreground: 217 91% 60%;
+  --yuyu-ai: 199 89% 60%;
+  --yuyu-ai-soft: 199 89% 60% / 0.14;
+  --yuyu-success: 160 67% 54%;
+  --yuyu-warning: 43 96% 56%;
+  --yuyu-destructive: 0 89% 70%;
+  --yuyu-destructive-foreground: 0 0% 100%;
+  --yuyu-focus-ring: 199 89% 60%;
+  --yuyu-ui-bg-app: #08090d;
+  --yuyu-ui-bg-main: #0d0f14;
+  --yuyu-ui-bg-sidebar: #11141a;
+  --yuyu-ui-bg-elevated: #161a22;
+  --yuyu-ui-text-primary: #f3f4f6;
+  --yuyu-ui-text-secondary: #9ca3af;
+  --yuyu-ui-text-muted: #6b7280;
+  --yuyu-ui-text-accent: #38bdf8;
+  --yuyu-ui-border: rgba(255, 255, 255, 0.08);
+  --yuyu-ui-brand: #3b82f6;
+  --yuyu-ui-brand-hover: #60a5fa;
+  --yuyu-ui-brand-soft: rgba(59, 130, 246, 0.15);
+  --yuyu-ui-selection-soft: rgba(59, 130, 246, 0.18);
+  --yuyu-ui-glass-canvas: linear-gradient(180deg, #0c0e14 0%, #08090d 100%);
+  --yuyu-ui-glass-primary: rgba(22, 26, 34, 0.82);
+  --yuyu-ui-glass-elevated: rgba(30, 36, 48, 0.92);
+  --yuyu-ui-glass-subtle: rgba(17, 20, 26, 0.85);
+  --yuyu-ui-glass-sidebar: #11141a;
+  --yuyu-ui-glass-rail: #090b0f;
+  --yuyu-ui-glass-message: #1a1f2a;
+  --yuyu-ui-glass-control: rgba(255, 255, 255, 0.04);
+  --yuyu-ui-glass-control-hover: rgba(255, 255, 255, 0.08);
+  --yuyu-ui-glass-popover: rgba(30, 36, 48, 0.95);
+  --yuyu-ui-glass-border: rgba(255, 255, 255, 0.08);
+  --yuyu-ui-glass-border-highlight: rgba(255, 255, 255, 0.12);
+  --yuyu-ui-glass-header: rgba(11, 13, 18, 0.9);
+  --yuyu-ui-glass-hover: rgba(255, 255, 255, 0.05);
+  --yuyu-ui-glass-control-strong: rgba(59, 130, 246, 0.18);
+  --yuyu-ui-glass-control-muted: rgba(255, 255, 255, 0.04);
+  --yuyu-ui-glass-disabled: transparent;
+  --yuyu-ui-glass-table-header: rgba(255, 255, 255, 0.04);
+  --yuyu-ui-glass-terminal: #12151c;
+  --yuyu-ui-glass-chat-list: #0d0f14;
+  --yuyu-ui-overlay: rgba(2, 6, 23, 0.62);
+  --yuyu-ui-code-bg: rgba(255, 255, 255, 0.06);
+  --yuyu-ui-shadow-glass: 0 18px 48px rgba(0, 0, 0, 0.28);
+  --yuyu-ui-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0, 0, 0.2);
+  --yuyu-ui-shadow-popover: 0 14px 34px rgba(0, 0, 0, 0.38);
+  --yuyu-ui-shadow-control-inset: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  --yuyu-ui-shadow-terminal-inset: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  --yuyu-ui-chart-trend: #38bdf8;
+  --yuyu-ui-chart-text: #7f9bff;
+  --yuyu-ui-chart-image: #34d399;
+  --yuyu-ui-chart-video: #fbbf24;
+  --yuyu-ui-chart-link: #f87171;
+  --yuyu-ui-chart-sticker: #a78bfa;
+  --yuyu-ui-chart-other: #60a5fa;
+  --yuyu-ui-chart-voice: #38bdf8;
+  --yuyu-ui-chart-file: #f472b6;
+  --yuyu-ui-log-hover: rgba(255, 255, 255, 0.04);
+  --yuyu-ui-source-agent-bg: rgba(45, 212, 191, 0.16);
+  --yuyu-ui-source-agent-text: #2dd4bf;
+  --yuyu-ui-source-connector-bg: rgba(59, 130, 246, 0.18);
+  --yuyu-ui-source-connector-text: #60a5fa;
+  --yuyu-ui-source-system-bg: rgba(245, 158, 11, 0.18);
+  --yuyu-ui-source-system-text: #fbbf24;
+  --yuyu-ui-status-warning-bg: rgba(245, 158, 11, 0.18);
+  --yuyu-ui-status-warning-text: #fbbf24;
+  --yuyu-ui-status-error-bg: rgba(239, 68, 68, 0.18);
+  --yuyu-ui-status-error-text: #f87171;
+  --yuyu-ui-danger-border: rgba(248, 113, 113, 0.24);
+  --yuyu-ui-danger-soft: rgba(248, 113, 113, 0.14);
+  --yuyu-ui-shadow-control: 0 4px 12px rgba(0, 0, 0, 0.16);
+  --yuyu-ui-overlay: rgba(2, 6, 23, 0.62);
+  --yuyu-ui-selection: rgba(59, 130, 246, 0.28);
+  --yuyu-ui-scrollbar: rgba(156, 163, 175, 0.28);
+  --yuyu-ui-scrollbar-hover: rgba(156, 163, 175, 0.46);
+}
+
+// Radix overlays render through a body-level portal, so they do not inherit
+// the variables scoped to .app-shell. Mirror the active glass theme on the
+// document root so popovers, menus, tooltips, and dialogs use the same tokens.
+html[data-theme='light'] {
+  @include light-glass-theme;
+}
+
+html[data-theme='dark'] {
+  @include dark-glass-theme;
+}
+
+// The shell receives the resolved effective theme, so system appearance uses
+// the same light or dark token set as an explicit selection.
+.app-shell.theme-light {
+  @include light-glass-theme;
+}
+
+.app-shell.theme-dark {
+  @include dark-content-theme;
+  @include dark-glass-theme;
+}
+
+// Keep the privacy notice readable in the light glass variant.
+.app-shell.theme-light {
+  .settings-workspace .settings-privacy-notice {
+    color: var(--yuyu-ui-text-secondary);
+  }
+
+  .settings-workspace .settings-privacy-notice strong {
+    color: var(--yuyu-ui-text-primary);
+  }
+
+  .settings-workspace .settings-privacy-notice p {
+    color: var(--yuyu-ui-text-muted);
+  }
+
+  .settings-workspace .settings-privacy-notice svg {
+    stroke: var(--yuyu-ui-brand);
+  }
+}
+
+.app-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--yuyu-ui-glass-border-highlight);
+  border-radius: var(--yuyu-ui-radius-window);
+  background: var(--yuyu-ui-glass-canvas);
+  color: var(--yuyu-ui-text-primary);
+  box-shadow: var(--yuyu-ui-shadow-glass);
+}
+
+.app-shell::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  background:
+    radial-gradient(circle at 8% 8%, rgba(89, 154, 255, 0.22), transparent 34%),
+    radial-gradient(circle at 94% 3%, rgba(219, 151, 255, 0.2), transparent 30%),
+    radial-gradient(circle at 78% 92%, rgba(92, 219, 210, 0.16), transparent 32%);
+}
+
+.app-shell.theme-dark::before {
+  background: none;
+}
+
+.app-shell-main,
+.app-primary-rail,
+.group-analytics-page,
+.conversation-sidebar,
+.chat-window,
+.ai-search-workspace,
+.ai-report-workspace,
+.settings-workspace,
+.api-center-layout,
+.export-workspace,
+.database-login-page,
+.exit-monitor-page,
+.exit-monitor-manage-page,
+.agent-hub-workspace,
+.report-market-page,
+.report-scheduled-page {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  color: var(--yuyu-ui-text-primary);
+}
+
+.app-window-header {
+  border-bottom-color: var(--yuyu-ui-glass-border);
+  background: var(--yuyu-ui-glass-header);
+  backdrop-filter: blur(24px) saturate(135%);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+}
+
+.app-primary-rail {
+  border-right-color: var(--yuyu-ui-glass-border);
+  background: var(--yuyu-ui-glass-rail);
+  backdrop-filter: blur(24px) saturate(135%);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+}
+
+.app-brand,
+.account-summary,
+.app-theme-switcher,
+.primary-nav-item {
+  border: 1px solid transparent;
+  border-radius: var(--yuyu-ui-radius-control);
+}
+
+.app-guide-header-btn,
+.app-theme-header-btn {
+  border: 1px solid var(--yuyu-ui-glass-border);
+  background: var(--yuyu-ui-glass-control);
+  color: var(--yuyu-ui-text-secondary);
+  border-radius: var(--yuyu-ui-radius-control);
+}
+
+.primary-nav-item:hover,
+.account-summary:hover,
+.app-theme-switcher:hover {
+  border-color: var(--yuyu-ui-glass-border-highlight);
+  background: var(--yuyu-ui-glass-control-hover);
+  color: var(--yuyu-ui-text-primary);
+  box-shadow: var(--yuyu-ui-shadow-control);
+}
+
+.app-guide-header-btn:hover,
+.app-theme-header-btn:hover {
+  border-color: var(--yuyu-ui-glass-border-highlight);
+  background: var(--yuyu-ui-glass-control-hover);
+  color: var(--yuyu-ui-brand);
+  box-shadow: var(--yuyu-ui-shadow-control);
+}
+
+.primary-nav-item.active {
+  border-color: color-mix(in srgb, var(--yuyu-ui-brand) 28%, transparent);
+  background: var(--yuyu-ui-brand-soft);
+  color: var(--yuyu-ui-brand);
+  box-shadow: var(--yuyu-ui-shadow-control);
+}
+
+.conversation-sidebar,
+.group-analytics-sidebar,
+.settings-sidebar,
+.report-source-sidebar,
+.report-history-sidebar,
+.ai-search-scope-panel,
+.api-runtime-panel,
+.export-preview-panel,
+.export-contact-panel {
+  border-color: var(--yuyu-ui-glass-border);
+  background: var(--yuyu-ui-glass-subtle);
+  backdrop-filter: blur(24px) saturate(135%);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+}
+
+.conversation-sidebar {
+  background: var(--yuyu-ui-glass-sidebar);
+}
+
+.app-shell:has(.conversation-sidebar) .app-rail-account {
+  border-top: 0;
+  background: var(--yuyu-ui-glass-header);
+}
+
+.app-shell.theme-dark .app-shell-main,
+.app-shell.theme-dark .chat-window,
+.app-shell.theme-dark .ai-search-workspace,
+.app-shell.theme-dark .ai-report-workspace,
+.app-shell.theme-dark .settings-workspace,
+.app-shell.theme-dark .api-center-layout,
+.app-shell.theme-dark .export-workspace,
+.app-shell.theme-dark .database-login-page,
+.app-shell.theme-dark .exit-monitor-page,
+.app-shell.theme-dark .exit-monitor-manage-page,
+.app-shell.theme-dark .agent-hub-workspace,
+.app-shell.theme-dark .report-market-page,
+.app-shell.theme-dark .report-scheduled-page {
+  background: var(--yuyu-ui-bg-main);
+}
+
+.app-shell.theme-dark .conversation-sidebar {
+  background: var(--yuyu-ui-glass-sidebar);
+}
+
+.conversation-sidebar-header,
+.conversation-sidebar-account,
+.group-analytics-sidebar-header,
+.group-analytics-sidebar-account,
+.settings-sidebar-account,
+.settings-sidebar header,
+.report-source-header,
+.report-history-header,
+.report-source-account,
+.report-history-account,
+.export-contact-panel-account,
+.ai-search-header,
+.chat-archive-header,
+.settings-page-header,
+.exit-monitor-header,
+.exit-monitor-manage-header,
+.agent-hub-header,
+.report-viewer-header,
+.report-scheduled-header {
+  border-color: var(--yuyu-ui-glass-border);
+  background: var(--yuyu-ui-glass-header);
+  backdrop-filter: blur(24px) saturate(135%);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+}
+
+.conversation-sidebar-title-row h2,
+.group-analytics-sidebar-header h2,
+.group-analytics-header h1,
+.ai-search-header h1,
+.settings-page-header h1,
+.agent-hub-header h1,
+.exit-monitor-header h1,
+.exit-monitor-manage-header h1 {
+  color: var(--yuyu-ui-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.conversation-sidebar-title-row span,
+.conversation-sidebar-meta,
+.group-analytics-sidebar-header span,
+.group-analytics-header p,
+.ai-search-header p,
+.settings-page-header p,
+.agent-hub-header p,
+.exit-monitor-header p,
+.exit-monitor-eyebrow,
+.report-history-list-title,
+.report-history-group h3 {
+  color: var(--yuyu-ui-text-secondary);
+}
+
+.conversation-search input,
+.group-analytics-search input,
+.chat-content-search input,
+.ai-search-composer textarea,
+.settings-workspace input,
+.settings-workspace textarea,
+.settings-workspace select,
+.api-center-layout input,
+.api-center-layout textarea,
+.api-center-layout select,
+.export-workspace input,
+.export-workspace textarea,
+.export-workspace select,
+.exit-monitor-page input,
+.exit-monitor-page textarea,
+.exit-monitor-page select,
+.exit-monitor-manage-page input,
+.exit-monitor-manage-page textarea,
+.exit-monitor-manage-page select,
+.group-analytics-page select,
+.group-analytics-member-trigger,
+button[role='combobox'],
+[data-radix-select-trigger] {
+  border: 1px solid var(--yuyu-ui-glass-border) !important;
+  border-radius: var(--yuyu-ui-radius-control) !important;
+  background: var(--yuyu-ui-glass-control) !important;
+  color: var(--yuyu-ui-text-primary) !important;
+  box-shadow: var(--yuyu-ui-shadow-control-inset);
+}
+
+.conversation-search input:hover,
+.group-analytics-search input:hover,
+.chat-content-search input:hover,
+.ai-search-composer textarea:hover,
+.settings-workspace input:hover,
+.settings-workspace textarea:hover,
+.settings-workspace select:hover,
+.api-center-layout input:hover,
+.api-center-layout textarea:hover,
+.api-center-layout select:hover,
+.export-workspace input:hover,
+.export-workspace textarea:hover,
+.export-workspace select:hover,
+.exit-monitor-page input:hover,
+.exit-monitor-page textarea:hover,
+.exit-monitor-page select:hover,
+.exit-monitor-manage-page input:hover,
+.exit-monitor-manage-page textarea:hover,
+.exit-monitor-manage-page select:hover,
+.group-analytics-page select:hover,
+.group-analytics-member-trigger:hover,
+button[role='combobox']:hover,
+[data-radix-select-trigger]:hover {
+  background: var(--yuyu-ui-glass-control-hover) !important;
+}
+
+.conversation-search input:focus,
+.group-analytics-search input:focus,
+.chat-content-search input:focus,
+.ai-search-composer textarea:focus,
+.settings-workspace input:focus,
+.settings-workspace textarea:focus,
+.settings-workspace select:focus,
+.api-center-layout input:focus,
+.api-center-layout textarea:focus,
+.api-center-layout select:focus,
+.export-workspace input:focus,
+.export-workspace textarea:focus,
+.export-workspace select:focus,
+.exit-monitor-page input:focus,
+.exit-monitor-page textarea:focus,
+.exit-monitor-page select:focus,
+.exit-monitor-manage-page input:focus,
+.exit-monitor-manage-page textarea:focus,
+.exit-monitor-manage-page select:focus,
+.group-analytics-page select:focus,
+.group-analytics-member-trigger:focus,
+button[role='combobox']:focus,
+[data-radix-select-trigger]:focus {
+  border-color: color-mix(in srgb, var(--yuyu-ui-brand) 50%, transparent) !important;
+}
+
+.group-analytics-member-trigger:disabled,
+.app-shell button[role='combobox']:disabled,
+.app-shell [data-radix-select-trigger][data-disabled] {
+  background: var(--yuyu-ui-glass-disabled) !important;
+  border-color: var(--yuyu-ui-glass-border) !important;
+  color: var(--yuyu-ui-text-muted) !important;
+  opacity: 0.62 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+.select-trigger-icon svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.app-shell.theme-dark .group-analytics-member-trigger:disabled,
+.app-shell.theme-dark button[role='combobox']:disabled,
+.app-shell.theme-dark [data-radix-select-trigger][data-disabled] {
+  background: transparent !important;
+  opacity: 0.5 !important;
+}
+
+.conversation-search input::placeholder,
+.group-analytics-search input::placeholder,
+.chat-content-search input::placeholder,
+.settings-workspace input::placeholder,
+.settings-workspace textarea::placeholder,
+.api-center-layout input::placeholder,
+.api-center-layout textarea::placeholder,
+.export-workspace input::placeholder,
+.export-workspace textarea::placeholder {
+  color: var(--yuyu-ui-text-muted);
+}
+
+.conversation-search:focus-within,
+.group-analytics-search:focus-within,
+.chat-content-search:focus-within {
+  color: var(--yuyu-ui-brand);
+}
+
+.conversation-item,
+.conversation-section-header,
+.group-analytics-group-item,
+.report-source-item,
+.report-history-item,
+.exit-monitor-group-row,
+.exit-monitor-event {
+  border: 1px solid transparent;
+  border-radius: var(--yuyu-ui-radius-control);
+  color: var(--yuyu-ui-text-secondary);
+}
+
+.conversation-item:hover,
+.conversation-section-header:hover,
+.group-analytics-group-item:hover,
+.report-source-item:hover,
+.report-history-item:hover,
+.exit-monitor-group-row:hover,
+.exit-monitor-event:hover {
+  border-color: var(--yuyu-ui-glass-border-highlight);
+  background: var(--yuyu-ui-glass-hover);
+  color: var(--yuyu-ui-text-primary);
+}
+
+.conversation-item.active,
+.group-analytics-group-item.active,
+.exit-monitor-group-row.selected {
+  border-color: color-mix(in srgb, var(--yuyu-ui-brand) 28%, transparent);
+  background: var(--yuyu-ui-brand-soft);
+  color: var(--yuyu-ui-brand);
+  box-shadow: var(--yuyu-ui-shadow-control);
+}
+
+.conversation-item-name,
+.group-analytics-group-name,
+.report-source-item.active,
+.report-history-item.active {
+  color: var(--yuyu-ui-text-primary);
+}
+
+.group-analytics-header,
+.ai-report-header,
+.settings-page-header,
+.api-workspace-heading,
+.export-workspace-header,
+.export-config-header,
+.agent-hub-header,
+.exit-monitor-header,
+.report-market-header,
+.report-scheduled-header {
+  background: transparent;
+}
+
+.group-analytics-filter-panel,
+.group-analytics-card,
+.settings-card,
+.agent-hub-card,
+.report-result-panel,
+.report-settings-panel,
+.report-task-panel,
+.report-info-panel,
+.export-config-panel,
+.export-preview-panel,
+.database-login-panel,
+.ai-search-main,
+.ai-search-debug-panel,
+.ai-search-evidence-panel,
+.exit-monitor-summary,
+.exit-monitor-events,
+.exit-monitor-setup-empty,
+.exit-monitor-manage-section,
+.report-market-card,
+.report-template-preview-card,
+.report-scheduled-card,
+.chat-empty-state,
+.chat-content-search,
+.voice-model-panel,
+.personal-wechat-send-dialog {
+  border: 1px solid var(--yuyu-ui-glass-border) !important;
+  border-radius: var(--yuyu-ui-radius-panel) !important;
+  background: var(--yuyu-ui-glass-primary) !important;
+  color: var(--yuyu-ui-text-primary);
+  box-shadow: var(--yuyu-ui-shadow-card);
+  backdrop-filter: blur(24px) saturate(135%);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+}
+
+.group-analytics-card,
+.settings-card,
+.agent-hub-card,
+.report-market-card,
+.report-scheduled-card {
+  border-radius: var(--yuyu-ui-radius-card) !important;
+}
+
+.group-analytics-card-header,
+.settings-card-kicker,
+.agent-hub-card-kicker,
+.report-section-heading,
+.report-model-summary-content,
+.api-runtime-title,
+.exit-monitor-section-heading {
+  color: var(--yuyu-ui-text-primary);
+}
+
+.settings-workspace,
+.settings-page,
+.settings-page-panel,
+.settings-page-scroll,
+.settings-page-content,
+.ai-report-workspace,
+.report-viewer,
+.api-center-layout,
+.export-workspace,
+.agent-hub-workspace,
+.exit-monitor-page,
+.exit-monitor-manage-page {
+  color: var(--yuyu-ui-text-primary);
+}
+
+.settings-workspace p,
+.settings-workspace small,
+.settings-workspace span,
+.settings-workspace code,
+.settings-workspace .settings-inline-note,
+.settings-workspace .settings-footnote,
+.settings-card p,
+.agent-hub-card p,
+.report-result-panel p,
+.report-settings-panel p,
+.api-runtime-panel p,
+.api-empty-text,
+.api-response-meta,
+.exit-monitor-event-details,
+.exit-monitor-setup-empty p {
+  color: var(--yuyu-ui-text-secondary);
+}
+
+.settings-choice,
+.settings-toggle-row,
+.settings-cache-item,
+.database-account-card,
+.ai-provider-card,
+.report-config-section,
+.report-section,
+.report-readonly-modules,
+.report-check-row,
+.report-result-preview,
+.agent-hub-log-body,
+.api-token-value,
+.api-response-summary,
+.api-history li,
+.exit-monitor-template-editor,
+.exit-monitor-group-filter,
+.exit-monitor-filter-trigger {
+  border-color: var(--yuyu-ui-glass-border) !important;
+  border-radius: var(--yuyu-ui-radius-control) !important;
+  background: var(--yuyu-ui-glass-control) !important;
+  color: var(--yuyu-ui-text-primary);
+}
+
+.app-shell .agent-hub-log-body {
+  border: 1px solid var(--yuyu-ui-glass-border) !important;
+  border-radius: var(--yuyu-ui-radius-control) !important;
+  background: var(--yuyu-ui-glass-terminal) !important;
+  color: var(--yuyu-ui-text-primary) !important;
+  box-shadow: var(--yuyu-ui-shadow-terminal-inset);
+}
+
+.app-shell .agent-hub-log-line:hover {
+  background: var(--yuyu-ui-log-hover);
+}
+
+.app-shell .agent-hub-log-line time {
+  color: var(--yuyu-ui-text-muted);
+}
+
+.app-shell .agent-hub-log-line code {
+  color: var(--yuyu-ui-text-primary) !important;
+}
+
+.app-shell .agent-hub-log-line .source {
+  background: var(--yuyu-ui-source-agent-bg);
+  color: var(--yuyu-ui-source-agent-text);
+}
+
+.app-shell .agent-hub-log-line .source.wechat-connector {
+  background: var(--yuyu-ui-source-connector-bg);
+  color: var(--yuyu-ui-source-connector-text);
+}
+
+.app-shell .agent-hub-log-line .source.system {
+  background: var(--yuyu-ui-source-system-bg);
+  color: var(--yuyu-ui-source-system-text);
+}
+
+.app-shell.theme-dark .agent-hub-log-body {
+  background: var(--yuyu-ui-glass-terminal) !important;
+  box-shadow: var(--yuyu-ui-shadow-terminal-inset);
+}
+
+.settings-choice.active,
+.settings-toggle-row:hover,
+.database-account-card.active,
+.ai-provider-card.active,
+.report-check-row.checked,
+.report-readonly-modules span.active {
+  border-color: color-mix(in srgb, var(--yuyu-ui-brand) 36%, var(--yuyu-ui-glass-border)) !important;
+  background: var(--yuyu-ui-brand-soft) !important;
+}
+
+.settings-choice b,
+.settings-toggle-row b,
+.settings-card strong,
+.database-account-card strong,
+.ai-provider-card strong,
+.report-result-panel h2,
+.report-settings-panel h2,
+.api-runtime-panel h2,
+.agent-hub-card h2,
+.exit-monitor-event-heading,
+.exit-monitor-manage-section h2 {
+  color: var(--yuyu-ui-text-primary);
+}
+
+.app-shell button:not(.primary-nav-item):not(.app-guide-header-btn):not(.settings-nav-item):not(.ai-search-secondary-menu button):not(.ai-search-time-menu button):not([role='tab']):not([role='checkbox']):not([role='switch']),
+.app-shell [role='button']:not(.settings-nav-item):not([role='tab']) {
+  border-radius: var(--yuyu-ui-radius-control);
+}
+
+.app-shell button[class*='bg-primary']:not([role='checkbox']):not([role='switch']),
+.app-shell button[class*='variant-default'],
+.app-shell .group-analytics-refresh-button,
+.app-shell .export-workspace button[type='submit'] {
+  border: 1px solid var(--yuyu-ui-glass-border-highlight) !important;
+  background: var(--yuyu-ui-glass-control-strong) !important;
+  color: var(--yuyu-ui-brand) !important;
+  box-shadow: var(--yuyu-ui-shadow-control);
+}
+
+.app-shell button[class*='bg-primary']:not([role='checkbox']):not([role='switch']):hover,
+.app-shell button[class*='variant-default']:hover,
+.app-shell .group-analytics-refresh-button:hover,
+.app-shell .export-workspace button[type='submit']:hover {
+  border-color: color-mix(in srgb, var(--yuyu-ui-brand) 28%, transparent) !important;
+  background: var(--yuyu-ui-brand-soft) !important;
+  color: var(--yuyu-ui-brand-hover) !important;
+}
+
+.app-shell button[class*='bg-secondary'],
+.app-shell button[class*='variant-secondary'],
+.app-shell button[class*='variant-outline'] {
+  border-color: var(--yuyu-ui-glass-border) !important;
+  background: var(--yuyu-ui-glass-control-muted) !important;
+  color: var(--yuyu-ui-text-secondary) !important;
+}
+
+.app-shell button[class*='bg-destructive'] {
+  border-color: var(--yuyu-ui-danger-border) !important;
+  background: var(--yuyu-ui-danger-soft) !important;
+  color: var(--yuyu-ui-danger) !important;
+}
+
+.app-shell button:disabled,
+.app-shell [role='button'][aria-disabled='true'] {
+  opacity: 0.52;
+  box-shadow: none;
+}
+
+.group-analytics-refresh-button {
+  min-height: 42px;
+  padding: 0 16px;
+  gap: 8px;
+  border-radius: var(--yuyu-ui-radius-control) !important;
+  border-color: color-mix(in srgb, var(--yuyu-ui-brand) 22%, var(--yuyu-ui-glass-border-highlight)) !important;
+  background: var(--yuyu-ui-glass-elevated) !important;
+  color: var(--yuyu-ui-brand) !important;
+  font-weight: 600;
+}
+
+.group-analytics-refresh-icon {
+  display: inline-flex;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+  }
+}
+
+.group-analytics-refresh-button:active {
+  box-shadow: var(--yuyu-ui-shadow-control);
+}
+
+.group-analytics-trend-card .group-analytics-grid-line {
+  stroke: color-mix(in srgb, var(--yuyu-ui-text-muted) 30%, transparent) !important;
+}
+
+.group-analytics-trend-card .group-analytics-trend-line {
+  fill: none !important;
+  stroke: var(--yuyu-ui-chart-trend) !important;
+  stroke-width: 2.75 !important;
+}
+
+.group-analytics-trend-card .group-analytics-trend-point {
+  fill: var(--yuyu-ui-glass-elevated) !important;
+  stroke: var(--yuyu-ui-chart-trend) !important;
+  stroke-width: 2.25 !important;
+}
+
+.dialog-content,
+[data-radix-dialog-content],
+[data-radix-popper-content-wrapper] > *,
+.popover-content,
+[data-radix-popover-content],
+.select-content,
+[data-radix-select-content],
+.dropdown-menu-content,
+[data-radix-dropdown-menu-content],
+.toast-viewport > *,
+[data-radix-toast-root] {
+  border-color: var(--yuyu-ui-glass-border) !important;
+  border-radius: var(--yuyu-ui-radius-lg) !important;
+  background: var(--yuyu-ui-glass-popover) !important;
+  color: var(--yuyu-ui-text-primary) !important;
+  box-shadow: var(--yuyu-ui-shadow-popover) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+[data-radix-dialog-overlay] {
+  background: var(--yuyu-ui-overlay) !important;
+  backdrop-filter: blur(8px) saturate(110%);
+  -webkit-backdrop-filter: blur(8px) saturate(110%);
+}
+
+[data-radix-select-content] [data-highlighted],
+[data-radix-dropdown-menu-content] [data-highlighted],
+[data-radix-popover-content] [data-highlighted],
+[data-radix-popper-content-wrapper] [data-highlighted],
+.select-content [data-highlighted],
+.dropdown-menu-content [data-highlighted],
+.popover-content [data-highlighted] {
+  background: var(--yuyu-ui-glass-control-hover) !important;
+  color: var(--yuyu-ui-text-primary) !important;
+}
+
+[data-radix-select-content] [data-state='checked'],
+[data-radix-dropdown-menu-content] [data-state='checked'],
+[data-radix-dropdown-menu-content] [data-state='on'],
+[data-radix-popper-content-wrapper] [data-state='checked'],
+.select-content [data-state='checked'],
+.dropdown-menu-content [data-state='checked'],
+.dropdown-menu-content [data-state='on'] {
+  background: var(--yuyu-ui-selection-soft) !important;
+  color: var(--yuyu-ui-text-primary) !important;
+}
+
+.app-shell table {
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--yuyu-ui-text-primary);
+}
+
+.app-shell th,
+.app-shell td {
+  border-color: var(--yuyu-ui-glass-border) !important;
+}
+
+.app-shell thead th {
+  background: var(--yuyu-ui-glass-table-header);
+  color: var(--yuyu-ui-text-secondary);
+  font-weight: 600;
+}
+
+.app-shell tbody tr:hover {
+  background: var(--yuyu-ui-brand-soft);
+}
+
+.message-bubble,
+.wechat-system-message,
+.forward-bundle,
+.card-message,
+.personal-wechat-send-status,
+.personal-wechat-send-target {
+  border-color: var(--yuyu-ui-glass-border) !important;
+  border-radius: var(--yuyu-ui-radius-control) !important;
+  background: var(--yuyu-ui-glass-message) !important;
+  color: var(--yuyu-ui-text-primary);
+  box-shadow: var(--yuyu-ui-shadow-card);
+}
+
+.wechat-message-row.mine .message-bubble {
+  border-color: color-mix(in srgb, var(--yuyu-ui-success) 30%, transparent) !important;
+  background: color-mix(
+    in srgb,
+    var(--yuyu-ui-success) 18%,
+    var(--yuyu-ui-glass-elevated)
+  ) !important;
+  color: var(--yuyu-ui-text-primary);
+}
+
+.wechat-message-list {
+  background: var(--yuyu-ui-glass-chat-list) !important;
+}
+
+
+
+.group-analytics-legend-dot {
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.app-shell a {
+  color: var(--yuyu-ui-brand);
+}
+
+.app-shell code,
+.app-shell pre {
+  border-radius: var(--yuyu-ui-radius-sm);
+  background: var(--yuyu-ui-code-bg);
+  color: var(--yuyu-ui-text-primary);
+}
+
+.app-shell .agent-hub-log-body code {
+  background: transparent;
+  color: inherit;
+}
+
+.app-shell ::selection {
+  background: var(--yuyu-ui-selection);
+  color: var(--yuyu-ui-text-primary);
+}
+
+.app-shell ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.app-shell ::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 10px 0;
+  margin-block: 10px;
+}
+
+.app-shell ::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--yuyu-ui-scrollbar);
+  background-clip: padding-box;
+}
+
+.app-shell ::-webkit-scrollbar-thumb:hover {
+  background: var(--yuyu-ui-scrollbar-hover);
+  background-clip: padding-box;
+}
+
+@media (max-width: 1180px) {
+  .group-analytics-header,
+  .ai-search-header,
+  .settings-page-header,
+  .agent-hub-header,
+  .exit-monitor-header {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .group-analytics-content,
+  .settings-page-content,
+  .agent-hub-content,
+  .exit-monitor-content {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell::before,
+  .app-shell * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+// Page-specific dark-mode cleanup. Keep exported report/image surfaces intact
+// while aligning ordinary application containers with the obsidian palette.
+.app-shell.theme-dark {
+  .settings-diagnostic-summary,
+  .database-key-auto-error,
+  .image-auto-error,
+  .ai-model-page-error {
+    border-left-color: var(--yuyu-ui-warning);
+    background: color-mix(in srgb, var(--yuyu-ui-warning) 12%, var(--yuyu-ui-bg-elevated));
+    color: var(--yuyu-ui-text-secondary);
+  }
+
+  .settings-diagnostic,
+  .database-key-diagnostics,
+  .database-key-connection-actions > div,
+  .image-batch-results,
+  .image-step-list {
+    border-color: var(--yuyu-ui-glass-border) !important;
+    background: var(--yuyu-ui-glass-primary) !important;
+  }
+
+  .settings-diagnostic span,
+  .settings-diagnostic small,
+  .settings-empty-state,
+  .settings-empty-state h2,
+  .database-key-status-card dt,
+  .database-key-status-card dd,
+  .database-key-diagnostics dt,
+  .database-key-diagnostics dd,
+  .database-key-editor label,
+  .database-key-editor > p,
+  .database-key-auto strong,
+  .database-key-auto p,
+  .database-key-security-info span,
+  .database-key-connection-actions > h2,
+  .database-key-connection-actions strong,
+  .database-key-connection-actions small,
+  .database-key-danger strong,
+  .database-key-danger small,
+  .image-decrypt-status dt,
+  .image-decrypt-status dd,
+  .image-resource-checks strong,
+  .image-resource-checks small,
+  .image-key-editor label,
+  .image-key-editor > p,
+  .image-test-section > div:first-child strong,
+  .image-test-section > div:first-child p,
+  .image-auto-detect strong,
+  .image-auto-detect p,
+  .image-batch-summary,
+  .image-batch-contact-name,
+  .image-batch-status,
+  .image-batch-time {
+    color: var(--yuyu-ui-text-secondary) !important;
+  }
+
+  .settings-diagnostic-summary strong,
+  .database-key-security-info strong,
+  .database-key-danger > h2,
+  .image-test-section > div:first-child strong,
+  .image-auto-detect strong {
+    color: var(--yuyu-ui-text-primary) !important;
+  }
+
+  .settings-diagnostic,
+  .image-resource-checks > div,
+  .database-key-prerequisites,
+  .image-auto-detect ul {
+    border-color: var(--yuyu-ui-glass-border) !important;
+  }
+
+  .settings-diagnostic-icon.success,
+  .database-key-success,
+  .image-state-success,
+  .image-resource-icon.available {
+    color: var(--yuyu-ui-success) !important;
+  }
+
+  .settings-diagnostic-icon.warning,
+  .database-key-prerequisites,
+  .image-batch-item.no-image .image-batch-status,
+  .image-batch-warning {
+    color: var(--yuyu-ui-warning) !important;
+  }
+
+  .settings-diagnostic-icon.error,
+  .database-key-danger > h2,
+  .image-state-error,
+  .image-inline-error,
+  .image-batch-item.failed .image-batch-status {
+    color: var(--yuyu-ui-danger) !important;
+  }
+
+  .database-key-badge.unconfigured,
+  .image-decrypt-badge.unconfigured,
+  .image-resource-icon,
+  .image-batch-counts span,
+  .image-batch-contact-type,
+  .image-auto-progress,
+  .database-key-feedback.checking {
+    background: var(--yuyu-ui-glass-control) !important;
+    color: var(--yuyu-ui-text-secondary) !important;
+  }
+
+  .database-key-badge.validating,
+  .image-decrypt-badge.partial,
+  .image-batch-counts .no-image {
+    background: color-mix(in srgb, var(--yuyu-ui-warning) 16%, var(--yuyu-ui-bg-elevated)) !important;
+    color: var(--yuyu-ui-warning) !important;
+  }
+
+  .database-key-badge.invalid,
+  .database-key-feedback.error,
+  .image-batch-counts .failed,
+  .image-auto-error {
+    border-color: color-mix(in srgb, var(--yuyu-ui-danger) 30%, var(--yuyu-ui-glass-border)) !important;
+    background: color-mix(in srgb, var(--yuyu-ui-danger) 12%, var(--yuyu-ui-bg-elevated)) !important;
+    color: var(--yuyu-ui-danger) !important;
+  }
+
+  .database-key-feedback.success,
+  .image-auto-success,
+  .image-batch-counts .success {
+    border-color: color-mix(in srgb, var(--yuyu-ui-success) 30%, var(--yuyu-ui-glass-border)) !important;
+    background: color-mix(in srgb, var(--yuyu-ui-success) 12%, var(--yuyu-ui-bg-elevated)) !important;
+    color: var(--yuyu-ui-success) !important;
+  }
+
+  .database-key-input-row,
+  .image-key-editor input {
+    border-color: var(--yuyu-ui-glass-border) !important;
+    background: var(--yuyu-ui-glass-control) !important;
+    color: var(--yuyu-ui-text-primary) !important;
+  }
+
+  .database-key-phases li,
+  .image-auto-phases li {
+    color: var(--yuyu-ui-text-muted);
+  }
+
+  .database-key-phases li::before,
+  .image-auto-phases li::before {
+    border-color: var(--yuyu-ui-glass-border-highlight);
+    background: var(--yuyu-ui-glass-elevated);
+    color: var(--yuyu-ui-text-secondary);
+  }
+
+  .database-key-phases li.active::before,
+  .image-auto-phases li.active::before {
+    border-color: var(--yuyu-ui-brand);
+    background: var(--yuyu-ui-brand);
+    color: hsl(var(--yuyu-primary-foreground));
+  }
+
+  .image-resource-icon.available {
+    background: color-mix(in srgb, var(--yuyu-ui-success) 18%, var(--yuyu-ui-bg-elevated)) !important;
+  }
+
+  .image-resource-icon.unavailable {
+    background: color-mix(in srgb, var(--yuyu-ui-danger) 16%, var(--yuyu-ui-bg-elevated)) !important;
+    color: var(--yuyu-ui-danger) !important;
+  }
+
+  .image-batch-progress {
+    background: var(--yuyu-ui-glass-control) !important;
+  }
+
+  .image-batch-progress span {
+    background: var(--yuyu-ui-success);
+  }
+
+  .report-viewer,
+  .report-settings-panel {
+    background: var(--yuyu-ui-bg-main) !important;
+  }
+
+  .report-settings-panel {
+    background: var(--yuyu-ui-bg-sidebar) !important;
+  }
+
+  .report-history-item:hover,
+  .report-source-item:hover,
+  .ai-search-secondary-menu button:hover,
+  .ai-search-time-menu button:hover {
+    background: var(--yuyu-ui-glass-hover) !important;
+  }
+
+  .report-history-empty button {
+    color: hsl(var(--yuyu-primary-foreground)) !important;
+  }
+
+  .group-analytics-member-trigger:hover:not(:disabled) {
+    background: var(--yuyu-ui-glass-control-hover) !important;
+  }
+
+  .group-analytics-member-trigger:disabled {
+    background: transparent !important;
+  }
+
+  .database-login-workspace {
+    background: var(--yuyu-ui-bg-main) !important;
+  }
+
+  .database-login-promises > div {
+    border-color: var(--yuyu-ui-glass-border) !important;
+    background: var(--yuyu-ui-glass-control) !important;
+    color: var(--yuyu-ui-text-secondary) !important;
+  }
+
+  .database-login-brand-footer,
+  .database-login-start li,
+  .database-login-platform-note,
+  .database-login-field > label,
+  .database-login-field small,
+  .database-login-diagnostics dt,
+  .database-login-diagnostics dd {
+    color: var(--yuyu-ui-text-secondary) !important;
+  }
+
+  .database-login-start li > span {
+    background: var(--yuyu-ui-brand-soft);
+    color: var(--yuyu-ui-brand-hover);
+  }
+
+  .database-login-state-card.error {
+    border-color: color-mix(in srgb, var(--yuyu-ui-danger) 32%, var(--yuyu-ui-glass-border));
+    background: color-mix(in srgb, var(--yuyu-ui-danger) 10%, var(--yuyu-ui-bg-elevated));
+  }
+
+  .database-login-state-card.error .database-login-state-icon {
+    color: var(--yuyu-ui-danger);
+    background: color-mix(in srgb, var(--yuyu-ui-danger) 16%, var(--yuyu-ui-bg-elevated));
+  }
+
+  .database-login-diagnostics {
+    border-color: var(--yuyu-ui-glass-border);
+  }
+
+  .database-login-diagnostics > div {
+    border-color: var(--yuyu-ui-glass-border);
+  }
+
+  .database-login-path-value,
+  .database-login-path-tooltip {
+    border-color: var(--yuyu-ui-glass-border);
+    background: var(--yuyu-ui-glass-popover);
+    color: var(--yuyu-ui-text-primary);
+    box-shadow: var(--yuyu-ui-shadow-popover);
+  }
+
+  .database-login-message.success {
+    background: color-mix(in srgb, var(--yuyu-ui-success) 12%, var(--yuyu-ui-bg-elevated));
+    color: var(--yuyu-ui-success);
+  }
+
+  .database-login-message.error {
+    background: color-mix(in srgb, var(--yuyu-ui-danger) 12%, var(--yuyu-ui-bg-elevated));
+    color: var(--yuyu-ui-danger);
+  }
+}
+
+html[data-theme='dark'] .boot-splash {
+  background: var(--yuyu-ui-glass-canvas);
+}
+
+html[data-theme='dark'] .boot-splash-spinner {
+  border-color: color-mix(in srgb, var(--yuyu-ui-brand) 22%, transparent);
+  border-top-color: var(--yuyu-ui-brand);
+}
+
+html[data-theme='dark'] .boot-splash-title {
+  color: var(--yuyu-ui-text-primary);
+}
+
+html[data-theme='dark'] .boot-splash-subtitle,
+html[data-theme='dark'] .boot-splash-detail {
+  color: var(--yuyu-ui-text-secondary);
+}
+
+html[data-theme='dark'] .boot-splash-progress {
+  background: var(--yuyu-ui-brand-soft);
+}
+
+html[data-theme='dark'] .boot-splash-progress-bar {
+  background: var(--yuyu-ui-brand);
+}
+
+html[data-theme='dark'] .app-toast {
+  border-color: color-mix(in srgb, var(--yuyu-ui-warning) 35%, var(--yuyu-ui-glass-border));
+  background: color-mix(in srgb, var(--yuyu-ui-warning) 12%, var(--yuyu-ui-glass-elevated));
+  color: var(--yuyu-ui-warning);
+}

@@ -12,6 +12,7 @@ const result = z
   .object({
     size: z.number().int().positive().max(maxBytes),
     sha256: z.string().regex(/^[a-f0-9]{64}$/)
+
   })
   .strict()
 function check<T>(schema: z.ZodType<T>, value: unknown, code = 'INVALID_RUNTIME_RESPONSE'): T {
@@ -39,13 +40,7 @@ export class WechatCDNClient {
     return this.ready
   }
   async decrypt(input: Buffer, key: string, signal?: AbortSignal) {
-    if (
-      !Buffer.isBuffer(input) ||
-      !input.length ||
-      input.length > maxBytes ||
-      input.length % 16 ||
-      !/^[a-f0-9]{32}$/i.test(key)
-    )
+    if (!Buffer.isBuffer(input) || !input.length || input.length > maxBytes || input.length % 16 || !/^[a-f0-9]{32}$/i.test(key))
       throw new RuntimeRpcError('INVALID_ARGUMENT')
     await this.capabilities(signal)
     const call = (method: string, params: RuntimeJson, cancel = signal) =>
@@ -53,9 +48,7 @@ export class WechatCDNClient {
     const { jobId } = check(
       z.object({ jobId: handle }).strict(),
       await call('cdn.open', {
-        key,
-        mode: 'aes-128-cbc-keyiv',
-        stripPadding: true,
+        key, mode: 'aes-128-cbc-keyiv', stripPadding: true,
         inputBytes: input.length,
         sha256: digest(input)
       })

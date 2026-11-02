@@ -9,3 +9,7 @@ playwright-report/
 .env
 .env.*
 .DS_Store
+
+build/icon.png
+examples/*.zip
+tests/e2e/__screenshots__/

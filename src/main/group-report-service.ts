@@ -1,0 +1,934 @@
+import { app, BrowserWindow, nativeImage } from 'electron'
+import crypto from 'node:crypto'
+import { appendFileSync } from 'node:fs'
+import fs from 'fs-extra'
+import os from 'os'
+import path from 'path'
+import { fileURLToPath } from 'node:url'
+import {
+  GroupReportExportRequest,
+  GroupReportExportResult,
+  GroupReportMetadata,
+  ReportHeat,
+  ReportSectionMeta,
+  buildReportAvatarAliasIndex,
+  mergeReportAvatars,
+  selectHeroParticipantNames
+} from '../shared/group-report'
+import { resolveMd5, getGroupSnapshot } from './services/chat-service'
+import { imageInsightService } from './services/image-insight-service'
+import { getReportTemplate } from '../shared/report-templates'
+import type { ReportTemplateRef } from '../shared/report-template-package'
+import { injectReportTemplateFragmentContract } from '../shared/report-template-fragment-contract'
+import { reportTemplateService, validateReportTemplateHtml } from './report-template-service'
+
+const STANDALONE_TEMPLATE_FILES: Record<string, string> = {
+  v1: 'mobile_daily_report_v1.html'
+}
+
+const templatePath = (templateId?: string): string => {
+  const name =
+    STANDALONE_TEMPLATE_FILES[templateId || ''] || getReportTemplate(templateId).resourceFile
+  const candidates = [
+    path.join(process.resourcesPath, 'resources', name),
+    path.join(app.getAppPath(), 'resources', name),
+    path.join(process.cwd(), 'resources', name)
+  ]
+  const found = candidates.find((candidate) => fs.existsSync(candidate))
+  if (!found) throw new Error(`日报模板不存在: ${candidates.join(' | ')}`)
+  return found
+}
+
+const resolveTemplateSelection = async (templateId?: string, templateRef?: ReportTemplateRef) => {
+  if (!templateRef) {
+    const definition = getReportTemplate(templateId)
+    return {
+      definition,
+      entryPath: templatePath(templateId),
+      captureMaxHeight: 20000,
+      source: 'builtin' as const
+    }
+  }
+  const installed = await reportTemplateService.resolve(templateRef)
+  return {
+    definition: {
+      id: installed.id,
+      order: 999,
+      platform: 'default' as const,
+      label: installed.name,
+      name: installed.name,
+      tagline: `${installed.author} · ${installed.version}`,
+      fileLabel: installed.name,
+      cssClass: `template-external-${installed.id.replace(/[^a-z0-9-]/gi, '-')}`,
+      resourceFile: installed.entryPath,
+      captureWidth: installed.capture.width,
+      maxCaptureWidth: installed.capture.maxWidth
+    },
+    entryPath: installed.entryPath,
+    captureMaxHeight: installed.capture.maxHeight,
+    source: 'installed' as const
+  }
+}
+
+const resolveTemplate = async (request: GroupReportExportRequest) =>
+  resolveTemplateSelection(request.templateId, request.templateRef)
+
+const escapeHtml = (value: unknown): string =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+
+const sanitizeFileName = (value: string): string =>
+  value
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim() || '未命名群聊'
+
+const hashName = (name: string): number => {
+  let hash = 0
+  for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  return hash
+}
+
+type RenderedAvatar = { source: string; fallback: boolean }
+
+const fallbackAvatar = (name: string): RenderedAvatar => {
+  const hue = hashName(name) % 360
+  const initial = escapeHtml(Array.from(name.trim())[0] || '?')
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect width="96" height="96" rx="18" fill="hsl(${hue} 45% 82%)"/><text x="48" y="58" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,PingFang SC,sans-serif" font-size="38" fill="hsl(${hue} 35% 28%)">${initial}</text></svg>`
+  return {
+    source: `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`,
+    fallback: true
+  }
+}
+
+/**
+ * 只认真实图片字节。
+ *
+ * `content-type` 与 URL 扩展名都**不可信**：微信 CDN 在限流 / 反盗链时会返回 200 + HTML 正文。
+ * 旧实现按扩展名猜 mime 并默认 `image/jpeg`，会把 HTML 内联成"解码失败的 data URL" ——
+ * 在报告里表现为**空白头像**（比首字占位更糟：用户看不到任何东西，也不知道为什么）。
+ */
+const IMAGE_MAGIC: Array<{ mime: string; bytes: number[] }> = [
+  { mime: 'image/jpeg', bytes: [0xff, 0xd8, 0xff] },
+  { mime: 'image/png', bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
+  { mime: 'image/gif', bytes: [0x47, 0x49, 0x46, 0x38] },
+  { mime: 'image/bmp', bytes: [0x42, 0x4d] }
+]
+
+export const detectImageMime = (bytes: Buffer): string | undefined => {
+  for (const signature of IMAGE_MAGIC) {
+    if (
+      bytes.length >= signature.bytes.length &&
+      signature.bytes.every((byte, index) => bytes[index] === byte)
+    ) {
+      return signature.mime
+    }
+  }
+  if (
+    bytes.length >= 12 &&
+    bytes.toString('ascii', 0, 4) === 'RIFF' &&
+    bytes.toString('ascii', 8, 12) === 'WEBP'
+  ) {
+    return 'image/webp'
+  }
+  const head = bytes.subarray(0, 64).toString('utf8').trimStart()
+  if (head.startsWith('<svg')) return 'image/svg+xml'
+  if (head.startsWith('<?xml') && head.includes('<svg')) return 'image/svg+xml'
+  return undefined
+}
+
+const AVATAR_FETCH_TIMEOUT_MS = 8000
+/** 首次 + 一次重试：单次瞬时失败（限流 / 连接重置 / 超时）不该让一个人永久退回首字。 */
+const AVATAR_FETCH_ATTEMPTS = 2
+/** 同一 origin 的并发上限。几十个头像同时打一个 CDN 会显著抬高被限流的概率。 */
+const AVATAR_FETCH_CONCURRENCY = 6
+/** 进程内头像缓存条目上限（老报告重渲染 / 连续生成同一群时不必重复下载）。 */
+const AVATAR_CACHE_LIMIT = 256
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
+const avatarEmbedCache = new Map<string, RenderedAvatar>()
+
+const rememberAvatarEmbed = (source: string, rendered: RenderedAvatar): void => {
+  if (rendered.fallback) return
+  avatarEmbedCache.set(source, rendered)
+  while (avatarEmbedCache.size > AVATAR_CACHE_LIMIT) {
+    const oldest = avatarEmbedCache.keys().next().value
+    if (oldest === undefined) break
+    avatarEmbedCache.delete(oldest)
+  }
+}
+
+/** 有界并发：把 N 个任务压到 limit 个同时在飞，结果顺序与输入一致。 */
+export const mapWithConcurrency = async <T, R>(
+  items: readonly T[],
+  limit: number,
+  task: (item: T) => Promise<R>
+): Promise<R[]> => {
+  const results: R[] = new Array(items.length)
+  let cursor = 0
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    for (;;) {
+      const index = cursor
+      cursor += 1
+      if (index >= items.length) return
+      results[index] = await task(items[index])
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
+
+const readAvatarSource = async (source: string): Promise<RenderedAvatar> => {
+  if (/^https?:\/\//i.test(source)) {
+    const response = await fetch(source, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 YUYU',
+        Referer: 'https://weixin.qq.com/'
+      },
+      signal: AbortSignal.timeout(AVATAR_FETCH_TIMEOUT_MS)
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const bytes = Buffer.from(await response.arrayBuffer())
+    const mime = detectImageMime(bytes)
+    if (!mime) {
+      throw new Error(
+        `not an image (content-type=${response.headers.get('content-type') || 'unknown'}, ${bytes.length} bytes)`
+      )
+    }
+    return { source: `data:${mime};base64,${bytes.toString('base64')}`, fallback: false }
+  }
+
+  const localPath = source.startsWith('file://') ? new URL(source) : source
+  const bytes = await fs.readFile(localPath)
+  const mime = detectImageMime(bytes)
+  if (!mime) throw new Error(`not an image (${bytes.length} bytes)`)
+  return { source: `data:${mime};base64,${bytes.toString('base64')}`, fallback: false }
+}
+
+export const embedAvatar = async (
+  source: string | undefined,
+  name: string
+): Promise<RenderedAvatar> => {
+  if (!source) return fallbackAvatar(name)
+  if (/^data:image\/[a-z0-9.+/-]+;base64,[a-z0-9+/=]+$/i.test(source))
+    return { source, fallback: false }
+
+  const cached = avatarEmbedCache.get(source)
+  if (cached) return cached
+
+  let lastError: unknown
+  for (let attempt = 1; attempt <= AVATAR_FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      const embedded = await readAvatarSource(source)
+      rememberAvatarEmbed(source, embedded)
+      return embedded
+    } catch (error) {
+      lastError = error
+      if (attempt < AVATAR_FETCH_ATTEMPTS) await sleep(150 * attempt)
+    }
+  }
+  console.warn(`[GroupReport] avatar fallback for ${name}:`, lastError)
+  return fallbackAvatar(name)
+}
+
+/**
+ * 从群成员快照反推真头像,填进 metadata.avatars。
+ * - 没传 talker → 跳过(向后兼容)
+ * - talker 解析失败 / snapshot 拿不到 → 200 + warn,继续走 fallback
+ * - 客户端传的 avatars[name](非空)优先;否则从 snapshot 的 m_nsHeadImgUrl 补
+ * - 同名取首条(P2 风险:群里两人同名)
+ *
+ * **必须按多个别名建索引**：报告里的显示名取决于 `memberNameMode`
+ * （默认 `groupNickname` = 群昵称），而快照的 `nickname` 字段是
+ * `wechatNickname || groupNickname || username`（见 `normalizeGroupMembers`）。
+ * 一个成员同时有微信昵称与群昵称且两者不同时，只按 `nickname` 建索引就会**全部对不上**，
+ * 于是头像 enrichment 静默失效 —— 这正是原先只用单一索引键时的问题。
+ */
+const enrichAvatarsFromGroup = async (metadata: GroupReportMetadata): Promise<void> => {
+  if (!metadata.talker) return
+
+  const resolved = resolveMd5(metadata.talker)
+  if (!resolved) {
+    metadata.warnings = metadata.warnings ?? []
+    metadata.warnings.push(`enrich skipped: talker "${metadata.talker}" not found`)
+    return
+  }
+
+  const snapshot = getGroupSnapshot(resolved.md5)
+  if (!snapshot) {
+    metadata.warnings = metadata.warnings ?? []
+    metadata.warnings.push(`enrich skipped: group snapshot not available for "${metadata.talker}"`)
+    return
+  }
+
+  // 每个成员的所有可用显示名都指向同一个头像 URL；先到先得，避免同名互相覆盖。
+  // 只按 `member.nickname` 建索引会在"微信昵称 ≠ 群昵称"时全部对不上 —— 见 shared 里的注释。
+  const index = buildReportAvatarAliasIndex(snapshot.members)
+
+  metadata.avatars = metadata.avatars ?? {}
+  const filled = mergeReportAvatars(metadata.avatars, index)
+
+  metadata.warnings = metadata.warnings ?? []
+  metadata.warnings.push(
+    `enriched ${filled}/${index.size} member avatar aliases from snapshot (${snapshot.memberCount} members)`
+  )
+}
+
+const heatClass = (heat: ReportHeat): string => {
+  if (heat === '高') return 'hot'
+  if (heat === '低') return 'blue'
+  return ''
+}
+
+const replacePlaceholder = (html: string, key: string, value: string): string =>
+  html.replaceAll(`{{${key}}}`, value)
+
+const addReportCsp = (html: string, allowFileImages = true): string =>
+  html.replace(
+    /<head(\s[^>]*)?>/i,
+    (head) =>
+      `${head}<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:${allowFileImages ? ' file:' : ''}; style-src 'unsafe-inline'; font-src 'none'; base-uri 'none'; form-action 'none'">`
+  )
+
+const inlineTemplateAssets = async (html: string, templateRoot: string): Promise<string> => {
+  const assetDataUrl = async (relative: string): Promise<string | null> => {
+    const assetPath = path.resolve(templateRoot, relative)
+    if (!assetPath.startsWith(`${path.resolve(templateRoot)}${path.sep}`)) return null
+    const extension = path.extname(assetPath).toLowerCase()
+    const mime =
+      extension === '.png' ? 'image/png' : extension === '.webp' ? 'image/webp' : 'image/jpeg'
+    const data = (await fs.readFile(assetPath)).toString('base64')
+    return `data:${mime};base64,${data}`
+  }
+  let result = html
+  for (const match of html.matchAll(/\bsrc=(['"])(assets\/[A-Za-z0-9._/-]+)\1/g)) {
+    const dataUrl = await assetDataUrl(match[2])
+    if (dataUrl) result = result.replace(match[0], `src="${dataUrl}"`)
+  }
+  for (const match of html.matchAll(/\burl\(\s*(['"]?)(assets\/[A-Za-z0-9._/-]+)\1\s*\)/g)) {
+    const dataUrl = await assetDataUrl(match[2])
+    if (dataUrl) result = result.replace(match[0], `url("${dataUrl}")`)
+  }
+  return result
+}
+
+const recordBlockedTemplateRequest = (
+  details: Electron.OnBeforeRequestListenerDetails,
+  reason: string
+): void => {
+  // 仅测试入口设置该路径，用于保留运行时拦截证据；生产默认不记录请求明细。
+  const logPath = process.env.YUYU_TEMPLATE_SECURITY_LOG
+  if (!logPath) return
+  try {
+    appendFileSync(
+      logPath,
+      `${JSON.stringify({
+        url: details.url,
+        method: details.method,
+        resourceType: details.resourceType,
+        reason
+      })}\n`,
+      'utf8'
+    )
+  } catch (error) {
+    console.warn('[GroupReport] failed to record template security block:', error)
+  }
+}
+
+const sectionMeta = (
+  request: GroupReportExportRequest,
+  key: keyof NonNullable<typeof request.report.sectionMeta>
+): ReportSectionMeta | undefined => request.report.sectionMeta?.[key]
+
+const sectionClass = (
+  request: GroupReportExportRequest,
+  key: keyof NonNullable<typeof request.report.sectionMeta>,
+  hasContent: boolean
+): string => (sectionMeta(request, key)?.enabled && hasContent ? '' : 'empty-section')
+
+const overflowNote = (
+  request: GroupReportExportRequest,
+  key: keyof NonNullable<typeof request.report.sectionMeta>
+): string => {
+  const meta = sectionMeta(request, key)
+  if (request.metadata.reportMode !== 'compact' || !meta?.hiddenCount) return ''
+  return `<div class="section-more">另有 ${meta.hiddenCount} 条内容，请在完整版中查看</div>`
+}
+
+const renderReportHtml = async (request: GroupReportExportRequest): Promise<string> => {
+  const { report, metadata } = request
+  const resolvedTemplate = await resolveTemplate(request)
+  const template = resolvedTemplate.definition
+  const avatarNames = new Set<string>(metadata.heroParticipants)
+  report.topics.forEach((topic) => topic.participants.forEach((name) => avatarNames.add(name)))
+  report.importantMessages.forEach((message) => avatarNames.add(message.sender))
+  report.quotes.forEach((quote) =>
+    quote.messages.forEach((message) => avatarNames.add(message.sender))
+  )
+  report.analytics.topSpeakers.forEach((speaker) => avatarNames.add(speaker.name))
+  report.media?.voiceHighlights?.forEach((item) => avatarNames.add(item.sender))
+  report.media?.funBadges?.forEach((item) => avatarNames.add(item.owner))
+
+  // 有界并发 + 单条重试：几十个头像同时打同一个 CDN 会被限流，瞬时失败会让一个人
+  // 在整份报告里永久退化成首字占位（实测同一天三次生成：0% / 0% / 32% 失败）。
+  const renderedAvatars = await mapWithConcurrency(
+    Array.from(avatarNames),
+    AVATAR_FETCH_CONCURRENCY,
+    async (name) => [name, await embedAvatar(metadata.avatars[name], name)] as const
+  )
+  const avatars = new Map(renderedAvatars)
+  const fallbackCount = renderedAvatars.filter(([, item]) => item.fallback).length
+  if (fallbackCount > 0) {
+    // 只记数量，不记人名：报告本身已经有名字，这里只需要一个可诊断的信号。
+    metadata.warnings = metadata.warnings ?? []
+    metadata.warnings.push(
+      `avatar fallback ${fallbackCount}/${renderedAvatars.length}: 未取到真实头像，已用首字占位`
+    )
+  }
+  const avatar = (name: string): RenderedAvatar => avatars.get(name) || fallbackAvatar(name)
+  const renderAvatar = (
+    name: string,
+    role: 'hero' | 'message' | 'participant' | 'ranking',
+    legacyClass = '',
+    alt = ''
+  ): string => {
+    const rendered = avatar(name)
+    const fallbackClass = rendered.fallback ? ' yuyu-avatar--fallback' : ''
+    return `<img class="${legacyClass ? `${legacyClass} ` : ''}yuyu-avatar yuyu-avatar--${role}${fallbackClass}" src="${escapeHtml(rendered.source)}" alt="${escapeHtml(alt)}">`
+  }
+
+  const heroNames = selectHeroParticipantNames(metadata.heroParticipants)
+  const heroAvatars = heroNames.map((name) => renderAvatar(name, 'hero', '', name)).join('')
+  const heroAvatarClass = heroNames.length ? `avatar-count-${heroNames.length}` : 'empty-section'
+
+  const topicCards = report.topics
+    .map(
+      (topic) => `<div class="card topic-card yuyu-fragment yuyu-topic-card">
+        <div class="topic-title-row yuyu-topic-card__title-row"><h3>${escapeHtml(topic.title)}</h3><span class="heat ${heatClass(topic.heat)}">${escapeHtml(topic.heat)}热</span></div>
+        <div class="topic-meta">${escapeHtml(topic.timeRange)}</div>
+        <p>${escapeHtml(topic.summary)}</p>
+        ${
+          topic.conclusions?.length
+            ? `<div class="topic-conclusions">${topic.conclusions
+                .slice(0, 2)
+                .map((entry) => `<div class="topic-conclusion">${escapeHtml(entry.text)}</div>`)
+                .join('')}</div>`
+            : topic.conclusion
+              ? `<div class="topic-conclusions"><div class="topic-conclusion">${escapeHtml(topic.conclusion)}</div></div>`
+              : ''
+        }
+        ${
+          topic.image
+            ? (() => {
+                // 优先用已有 imageUrl;若有 imageHash(来自 visionGallery),按 hash 取原图
+                let imageUrl = topic.image.imageUrl
+                if (!imageUrl && topic.image.imageHash) {
+                  const insight = imageInsightService.getInsight(topic.image.imageHash)
+                  if (insight) {
+                    // insight 不含 imageUrl,需要按 md5/datName 重新拿;这里通过 ImageDecryptService 间接获取
+                    // 走 ImageDecryptService.findImageFile + decryptImageToBase64
+                    const decryptService = (
+                      globalThis as {
+                        __imageDecrypt?: {
+                          findImageFile: (md5?: string, dat?: string) => string | null
+                          decryptImageToBase64: (p: string) => string | null
+                        }
+                      }
+                    ).__imageDecrypt
+                    if (decryptService) {
+                      const filePath = decryptService.findImageFile(insight.md5, insight.datName)
+                      if (filePath)
+                        imageUrl = decryptService.decryptImageToBase64(filePath) || undefined
+                    }
+                  }
+                }
+                if (!imageUrl) return ''
+                return `<div class="topic-inline-image"><img src="${escapeHtml(imageUrl)}" alt="热点图片"><div>${escapeHtml(topic.image.note)}</div></div>`
+              })()
+            : ''
+        }
+        <div class="participants yuyu-topic-card__participants">${topic.participants
+          .slice(0, 5)
+          .map(
+            (name) =>
+              `<span class="person-chip yuyu-participant">${renderAvatar(name, 'participant')}<b class="yuyu-participant__name">${escapeHtml(name)}</b></span>`
+          )
+          .join('')}</div>
+        <div class="keywords">${topic.keywords.map((word) => `<span>${escapeHtml(word)}</span>`).join('')}</div>
+      </div>`
+    )
+    .join('')
+
+  const resourceItems = report.resources
+    .map(
+      (resource) =>
+        `<div class="resource"><b>${escapeHtml(resource.title)}</b>${resource.sender ? ` · ${escapeHtml(resource.sender)}` : ''}<br>${escapeHtml(resource.description)}</div>`
+    )
+    .join('')
+
+  const importantMessages = report.importantMessages
+    .map(
+      (message) => `<div class="important-card yuyu-fragment yuyu-message yuyu-message--important">
+        ${renderAvatar(message.sender, 'message', 'avatar')}
+        <div class="important-body yuyu-message__body"><div class="important-meta yuyu-message__meta"><b class="yuyu-message__author">${escapeHtml(message.sender)}</b><span class="yuyu-message__time">${escapeHtml(message.time)}</span></div>
+        <div class="important-text yuyu-message__text">${escapeHtml(message.content)}</div><div class="important-note yuyu-message__note">${escapeHtml(message.note)}</div></div>
+      </div>`
+    )
+    .join('')
+
+  const quoteBlocks = report.quotes
+    .map(
+      (quote) =>
+        `<div class="chat-block yuyu-fragment yuyu-quote">${quote.messages
+          .map(
+            (
+              message
+            ) => `<div class="chat-msg yuyu-message yuyu-message--quote">${renderAvatar(message.sender, 'message', 'chat-avatar')}<div class="yuyu-message__body">
+            <div class="chat-name yuyu-message__author">${escapeHtml(message.sender)}</div><div class="chat-bubble yuyu-message__text">${escapeHtml(message.content)}</div>
+          </div></div>`
+          )
+          .join('')}<div class="quote-note">${escapeHtml(quote.note)}</div></div>`
+    )
+    .join('')
+
+  const todoCards = (report.todos || [])
+    .map(
+      (item) => `<div class="action-card todo-card yuyu-fragment yuyu-todo-card">
+        <b>${escapeHtml(item.task)}</b>
+        <div>${[item.owner || '', item.deadline || '', item.topic || ''].filter(Boolean).map(escapeHtml).join(' · ')}</div>
+        ${item.note ? `<div class="action-note">${escapeHtml(item.note)}</div>` : ''}
+      </div>`
+    )
+    .join('')
+
+  const unresolvedCards = (report.unresolved || [])
+    .map(
+      (item) => `<div class="action-card unresolved-card yuyu-fragment yuyu-unresolved-card">
+        <b>${escapeHtml(item.question)}</b>
+        <div>${[item.owner || '', item.lastDiscussedAt || '', item.status].filter(Boolean).map(escapeHtml).join(' · ')}</div>
+        <div class="action-note">${escapeHtml(item.note)}</div>
+      </div>`
+    )
+    .join('')
+
+  const storylineCards = (report.storylines || [])
+    .map(
+      (item) => `<div class="card storyline-card">
+        <div class="topic-title-row"><h3>${escapeHtml(item.title)}</h3></div>
+        <div class="storyline-steps">${item.stages
+          .map(
+            (stage) => `<div class="storyline-step">
+              <span>${escapeHtml(stage.time || '--:--')}</span>
+              <b>${escapeHtml(stage.event)}</b>
+            </div>`
+          )
+          .join('')}</div>
+        ${item.result ? `<p class="muted">${escapeHtml(item.result)}</p>` : ''}
+      </div>`
+    )
+    .join('')
+
+  const reversalCards = (report.reversals || [])
+    .map(
+      (item) => `<div class="qa-card yuyu-fragment yuyu-reversal-card">
+        <b>${escapeHtml(item.topic)}</b>
+        <div>最初：${escapeHtml(item.initialView)}</div>
+        <div>后来：${escapeHtml(item.finalView)}</div>
+        ${item.note ? `<div>${escapeHtml(item.note)}</div>` : ''}
+      </div>`
+    )
+    .join('')
+
+  const chainCards = (report.participantChains || [])
+    .map(
+      (item) => `<div class="card chain-card">
+        <div class="topic-title-row"><h3>${escapeHtml(item.topic)}</h3></div>
+        <div class="chain-flow">${item.chain.map((node) => `<span>${escapeHtml(node)}</span>`).join('<i>→</i>')}</div>
+        ${item.note ? `<p class="muted">${escapeHtml(item.note)}</p>` : ''}
+      </div>`
+    )
+    .join('')
+
+  // AI 图片理解结果板块(ImageInsight)
+  // 内容由 ImageInsightService.analyze 生成,真实看图 + 看上下文
+  const visionCards = (report.media?.visionGallery || [])
+    .filter((item) => item.imageUrl) // 只显示加载成功的图
+    .map(
+      (item) => `<div class="vision-card">
+        <img class="vision-image" src="${escapeHtml(item.imageUrl)}" alt="AI 识别的图片">
+        <div class="vision-body">
+          <div class="important-meta"><b>${escapeHtml(item.sender)}</b><span>${escapeHtml(item.time)}</span></div>
+          <div class="vision-description">${escapeHtml(item.description)}</div>
+          ${item.ocrText ? `<div class="vision-ocr">📝 ${escapeHtml(item.ocrText)}</div>` : ''}
+          ${item.tags.length ? `<div class="vision-tags">${item.tags.map((t) => `<span class="vision-tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+          <div class="vision-label">AI 图片识别</div>
+        </div>
+      </div>`
+    )
+    .join('')
+
+  const voiceCards = (report.media?.voiceHighlights || [])
+    .map(
+      (item) => `<div class="qa-card yuyu-fragment yuyu-voice-card">
+        <b>${escapeHtml(item.title)} · ${escapeHtml(item.sender)}</b>
+        <div>${escapeHtml(item.note)}</div>
+      </div>`
+    )
+    .join('')
+
+  const voiceRankCards = (report.analytics.voiceLeaderboard || [])
+    .map(
+      (item, index) => `<div class="rank yuyu-fragment yuyu-ranking-item">
+        ${renderAvatar(item.sender, 'ranking')}
+        <b>${index + 1}. ${escapeHtml(item.sender)}</b>
+        <span>${item.count} 条 · ${Math.round(item.durationSec)} 秒</span>
+      </div>`
+    )
+    .join('')
+
+  const badgeCards = (report.media?.funBadges || [])
+    .map(
+      (item) => `<div class="badge-card">
+        <span class="tag">${escapeHtml(item.title)}</span>
+        <b>${escapeHtml(item.owner)}</b>
+        <p>${escapeHtml(item.note)}</p>
+      </div>`
+    )
+    .join('')
+
+  const rankItems = report.analytics.topSpeakers
+    .slice(0, 5)
+    .map(
+      (speaker, index) =>
+        `<div class="rank yuyu-fragment yuyu-ranking-item">${renderAvatar(speaker.name, 'ranking')}<b>${index + 1}. ${escapeHtml(speaker.name)}</b><span>${Math.max(0, speaker.count)} 条</span></div>`
+    )
+    .join('')
+
+  // v1 模板使用的水平条形热度图,渲染 top speakers 排行
+  const heatSpeakers = report.analytics.topSpeakers.slice(0, 8)
+  const maxSpeakerCount = Math.max(1, ...heatSpeakers.map((speaker) => Math.max(0, speaker.count)))
+  const heatBarsHtml = heatSpeakers
+    .map((speaker) => {
+      const count = Math.max(0, speaker.count)
+      const width = Math.max(4, Math.round((count / maxSpeakerCount) * 100))
+      return `<div class="heat-row">
+        <span class="heat-name">${escapeHtml(speaker.name)}</span>
+        <span class="heat-bar"><i style="width:${width}%"></i></span>
+        <span class="heat-val">${count}</span>
+      </div>`
+    })
+    .join('')
+
+  const cloudTags = report.keywords
+    .slice(0, 15)
+    .map(
+      (word, index) =>
+        `<span class="${index < 2 ? 'xl' : index < 5 ? 'lg' : index < 9 ? 'md' : ''}">${escapeHtml(word)}</span>`
+    )
+    .join('')
+
+  const qaCards = report.qa
+    .map(
+      (item) =>
+        `<div class="qa-card yuyu-fragment yuyu-qa-card"><b>Q：${escapeHtml(item.question)}</b><div>A：${escapeHtml(item.answer)}${item.answerer ? ` — ${escapeHtml(item.answerer)}` : ''}</div></div>`
+    )
+    .join('')
+
+  const summaryStats = report.summaryStats || {
+    messageCount: metadata.messageCount,
+    activeUsers: metadata.activeUsers,
+    topicCount: report.topics.length,
+    mediaCount: metadata.mediaMessageCount || 0,
+    imageCount: metadata.imageCount || 0,
+    voiceCount: metadata.voiceCount || 0,
+    stickerCount: metadata.stickerCount || 0,
+    conclusionCount: 0,
+    todoCount: report.todos.length,
+    unresolvedCount: report.unresolved.length
+  }
+
+  let html = await fs.readFile(resolvedTemplate.entryPath, 'utf8')
+  if (resolvedTemplate.source === 'installed') {
+    validateReportTemplateHtml(html, path.basename(resolvedTemplate.entryPath))
+    html = await inlineTemplateAssets(html, path.dirname(resolvedTemplate.entryPath))
+  }
+  const values: Record<string, string> = {
+    TEMPLATE_CLASS: template.cssClass,
+    TEMPLATE_LABEL: escapeHtml(template.label),
+    TEMPLATE_NAME: escapeHtml(template.name),
+    REPORT_TITLE: escapeHtml(`${metadata.groupName}日报`),
+    REPORT_DATE: escapeHtml(metadata.reportDate),
+    REPORT_MODE_CLASS: metadata.reportMode === 'full' ? 'full' : 'compact',
+    GROUP_NAME: escapeHtml(metadata.groupName),
+    DATE_RANGE: escapeHtml(metadata.dateRange),
+    RECORD_NOTE: escapeHtml(metadata.recordNote),
+    // v1 模板使用的 OVERVIEW(经典版以概览段落呈现)
+    OVERVIEW: escapeHtml(
+      report.overview || report.hero?.summary || '基于已读取聊天记录生成的群聊日报'
+    ),
+    // v2 模板使用的 hero-*
+    HERO_HEADLINE: escapeHtml(report.hero?.headline || '今日群聊速览'),
+    HERO_SUMMARY: escapeHtml(report.hero?.summary || report.overview),
+    HERO_TAKEAWAY: escapeHtml(report.hero?.keyTakeaway || ''),
+    HERO_PENDING: escapeHtml(report.hero?.pendingNote || ''),
+    HERO_STATUS_LINE: escapeHtml(report.hero?.statusLine || ''),
+    HERO_STATUS_EMPTY_CLASS: report.hero?.statusLine ? '' : 'empty-section',
+    HERO_TAKEAWAY_EMPTY_CLASS: report.hero?.keyTakeaway ? '' : 'empty-section',
+    HERO_PENDING_EMPTY_CLASS: report.hero?.pendingNote ? '' : 'empty-section',
+    HERO_AVATARS: heroAvatars,
+    HERO_AVATAR_CLASS: heroAvatarClass,
+    MESSAGE_COUNT: String(summaryStats.messageCount),
+    ACTIVE_USERS: String(summaryStats.activeUsers),
+    TIME_SPAN: escapeHtml(metadata.timeSpan || ''),
+    TOPIC_COUNT: String(summaryStats.topicCount),
+    MEDIA_COUNT: String(summaryStats.mediaCount),
+    TOPIC_CARDS: topicCards,
+    TOPICS_EMPTY_CLASS: sectionClass(request, 'topics', report.topics.length > 0),
+    TOPICS_MORE_NOTE: overflowNote(request, 'topics'),
+    RESOURCES_EMPTY_CLASS: sectionClass(request, 'resources', report.resources.length > 0),
+    RESOURCE_ITEMS: resourceItems,
+    RESOURCES_MORE_NOTE: overflowNote(request, 'resources'),
+    MESSAGES_EMPTY_CLASS: sectionClass(
+      request,
+      'importantMessages',
+      report.importantMessages.length > 0
+    ),
+    IMPORTANT_MESSAGES: importantMessages,
+    MESSAGES_MORE_NOTE: overflowNote(request, 'importantMessages'),
+    QUOTES_EMPTY_CLASS: sectionClass(request, 'moments', report.quotes.length > 0),
+    QUOTE_BLOCKS: quoteBlocks,
+    QUOTES_MORE_NOTE: overflowNote(request, 'moments'),
+    ACTIONS_EMPTY_CLASS: sectionClass(
+      request,
+      'actions',
+      report.todos.length + report.unresolved.length > 0
+    ),
+    TODO_EMPTY_CLASS: report.todos.length ? '' : 'empty-section',
+    TODO_CARDS: todoCards,
+    UNRESOLVED_EMPTY_CLASS: report.unresolved?.length ? '' : 'empty-section',
+    UNRESOLVED_CARDS: unresolvedCards,
+    ACTIONS_MORE_NOTE: overflowNote(request, 'actions'),
+    QA_EMPTY_CLASS: sectionClass(request, 'qa', report.qa.length > 0),
+    QA_CARDS: qaCards,
+    QA_MORE_NOTE: overflowNote(request, 'qa'),
+    STORYLINES_EMPTY_CLASS: sectionClass(request, 'storylines', report.storylines?.length > 0),
+    STORYLINE_CARDS: storylineCards,
+    STORYLINES_MORE_NOTE: overflowNote(request, 'storylines'),
+    REVERSALS_EMPTY_CLASS: sectionClass(request, 'reversals', report.reversals?.length > 0),
+    REVERSAL_CARDS: reversalCards,
+    REVERSALS_MORE_NOTE: overflowNote(request, 'reversals'),
+    CHAINS_EMPTY_CLASS: sectionClass(request, 'chains', report.participantChains?.length > 0),
+    CHAIN_CARDS: chainCards,
+    CHAINS_MORE_NOTE: overflowNote(request, 'chains'),
+    // AI 图片识别板块
+    VISION_EMPTY_CLASS: sectionClass(
+      request,
+      'vision',
+      (report.media?.visionGallery?.length ?? 0) > 0
+    ),
+    VISION_CARDS: visionCards,
+    VISION_TITLE: '📸 AI 识别的图片精选',
+    VOICE_EMPTY_CLASS: sectionClass(request, 'voices', report.media?.voiceHighlights?.length > 0),
+    VOICE_CARDS: voiceCards,
+    VOICE_MORE_NOTE: overflowNote(request, 'voices'),
+    VOICE_RANK_EMPTY_CLASS: sectionClass(
+      request,
+      'voices',
+      report.analytics.voiceLeaderboard?.length > 0
+    ),
+    VOICE_RANK_CARDS: voiceRankCards,
+    BADGES_EMPTY_CLASS: sectionClass(request, 'badges', report.media?.funBadges?.length > 0),
+    BADGE_CARDS: badgeCards,
+    BADGES_MORE_NOTE: overflowNote(request, 'badges'),
+    RANK_ITEMS: rankItems,
+    ACTIVITY_TIMELINE: escapeHtml(report.analytics.activeTimeline),
+    CONCLUSION_COUNT: String(summaryStats.conclusionCount),
+    TODO_COUNT: String(summaryStats.todoCount),
+    UNRESOLVED_COUNT: String(summaryStats.unresolvedCount),
+    CLOUD_TAGS: cloudTags,
+    KEYWORDS_EMPTY_CLASS: sectionClass(request, 'keywords', report.keywords.length > 0),
+    KEYWORDS_MORE_NOTE: overflowNote(request, 'keywords'),
+    ANALYTICS_EMPTY_CLASS: sectionClass(request, 'analytics', true),
+    GENERATED_AT: escapeHtml(metadata.generatedAt),
+    FOOTER_NOTE: escapeHtml(metadata.footerNote),
+    // v1 模板独有:从 analytics.topSpeakers 渲染水平条形热度图
+    HEAT_BARS: heatBarsHtml
+  }
+  for (const [key, value] of Object.entries(values)) html = replacePlaceholder(html, key, value)
+  // 清空模板中残留的未使用占位符(模板独有但 values 没提供的键)
+  html = html.replace(/\{\{[A-Z_]+\}\}/g, '')
+  return addReportCsp(
+    injectReportTemplateFragmentContract(html),
+    resolvedTemplate.source === 'builtin'
+  )
+}
+
+const captureFullPage = async (
+  htmlPath: string,
+  pngPath: string,
+  templateId?: string,
+  templateOverride?: {
+    captureWidth: number
+    maxCaptureWidth: number
+    maxCaptureHeight?: number
+  }
+): Promise<string> => {
+  const template = templateOverride || getReportTemplate(templateId)
+  const captureWidth = STANDALONE_TEMPLATE_FILES[templateId || ''] ? 430 : template.captureWidth
+  const maxCaptureWidth = STANDALONE_TEMPLATE_FILES[templateId || '']
+    ? 1200
+    : template.maxCaptureWidth
+  const maxCaptureHeight = templateOverride?.maxCaptureHeight || 20000
+  console.log(`[GroupReport] capture begin html=${htmlPath}`)
+  const reportSessionPartition = `report-template-${crypto.randomUUID()}`
+  const reportWindow = new BrowserWindow({
+    show: false,
+    opacity: 0,
+    skipTaskbar: true,
+    width: captureWidth,
+    height: 800,
+    frame: false,
+    backgroundColor: '#f3f5f7',
+    webPreferences: {
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      partition: reportSessionPartition
+    }
+  })
+  const allowedDocumentPath = path.resolve(htmlPath)
+  const requestHandler = (
+    details: Electron.OnBeforeRequestListenerDetails,
+    callback: (response: { cancel: boolean }) => void
+  ): void => {
+    if (details.url.startsWith('file:')) {
+      try {
+        const requestedPath = path.resolve(fileURLToPath(details.url))
+        if (requestedPath === allowedDocumentPath) {
+          callback({ cancel: false })
+        } else {
+          recordBlockedTemplateRequest(details, 'file-path-not-allowed')
+          callback({ cancel: true })
+        }
+      } catch {
+        recordBlockedTemplateRequest(details, 'invalid-file-url')
+        callback({ cancel: true })
+      }
+      return
+    }
+    recordBlockedTemplateRequest(details, 'scheme-not-allowed')
+    callback({ cancel: true })
+  }
+  reportWindow.webContents.session.webRequest.onBeforeRequest(
+    { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*', 'file://*/*'] },
+    requestHandler
+  )
+  reportWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  reportWindow.webContents.on('will-navigate', (event) => event.preventDefault())
+
+  try {
+    const readyToShow = new Promise<void>((resolve) => reportWindow.once('ready-to-show', resolve))
+    await reportWindow.loadFile(htmlPath)
+    await readyToShow
+    console.log('[GroupReport] capture loaded html')
+    await reportWindow.webContents.executeJavaScript(`Promise.all([
+      document.fonts.ready,
+      ...Array.from(document.images).map((img) => img.complete ? Promise.resolve() : new Promise((resolve) => {
+        img.addEventListener('load', resolve, { once: true });
+        img.addEventListener('error', resolve, { once: true });
+      }))
+    ])`)
+    console.log('[GroupReport] capture assets ready')
+    const metrics = (await reportWindow.webContents.executeJavaScript(`({
+      width: Math.ceil(Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, ${captureWidth})),
+      height: Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, 800))
+    })`)) as { width: number; height: number }
+    const width = Math.max(captureWidth, Math.min(maxCaptureWidth, Math.ceil(metrics.width)))
+    const height = Math.max(800, Math.min(maxCaptureHeight, Math.ceil(metrics.height)))
+    const [currentWidth, currentHeight] = reportWindow.getContentSize()
+    if (currentWidth !== width || currentHeight !== height) {
+      const resized = new Promise<void>((resolve) => reportWindow.once('resize', resolve))
+      reportWindow.setContentSize(width, height)
+      await resized
+    }
+    await reportWindow.webContents.executeJavaScript(
+      'new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))'
+    )
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    console.log(`[GroupReport] capture native page width=${width} height=${height}`)
+    const image = await reportWindow.webContents.capturePage(
+      { x: 0, y: 0, width, height },
+      { stayHidden: true }
+    )
+    // Captures carry the display scale (for example 2x on Retina). Normalize the
+    // encoded pixels so manifest capture limits have the same meaning on every screen.
+    const png = nativeImage.createFromBuffer(image.toPNG()).resize({ width, height }).toPNG()
+    if (png.length < 1000) throw new Error('生成的日报图片为空')
+    await fs.writeFile(pngPath, png)
+    console.log(`[GroupReport] capture ok bytes=${png.length} png=${pngPath}`)
+    return `data:image/png;base64,${png.toString('base64')}`
+  } finally {
+    reportWindow.webContents.session.webRequest.onBeforeRequest(null)
+    reportWindow.destroy()
+  }
+}
+
+export const exportGroupReport = async (
+  request: GroupReportExportRequest
+): Promise<GroupReportExportResult> => {
+  try {
+    // === enrich 在 render 之前:从群成员快照反推真头像 ===
+    await enrichAvatarsFromGroup(request.metadata)
+
+    const outputDir =
+      process.env.YUYU_REPORT_OUTPUT_DIR ||
+      path.join(os.homedir(), 'Documents', '微信聊天记录')
+    await fs.ensureDir(outputDir)
+    const resolvedTemplate = await resolveTemplate(request)
+    const templateLabel = request.templateRef
+      ? resolvedTemplate.definition.fileLabel
+      : request.templateId === 'v1'
+        ? '经典版'
+        : getReportTemplate(request.templateId).fileLabel
+    const baseName = `${sanitizeFileName(request.metadata.groupName)}日报_${request.metadata.reportDate}_${templateLabel}`
+    const htmlPath = path.join(outputDir, `${baseName}.html`)
+    const pngPath = path.join(outputDir, `${baseName}.png`)
+    const htmlStartedAt = new Date()
+    const html = await renderReportHtml(request)
+    await fs.writeFile(htmlPath, html, 'utf8')
+    const htmlEndedAt = new Date()
+    const pngStartedAt = new Date()
+    const imageDataUrl = await captureFullPage(htmlPath, pngPath, request.templateId, {
+      ...resolvedTemplate.definition,
+      maxCaptureHeight: resolvedTemplate.captureMaxHeight
+    })
+    const pngEndedAt = new Date()
+    return {
+      success: true,
+      htmlPath,
+      pngPath,
+      imageDataUrl,
+      exportTimings: {
+        html: {
+          startedAt: htmlStartedAt.toISOString(),
+          endedAt: htmlEndedAt.toISOString(),
+          duration: htmlEndedAt.getTime() - htmlStartedAt.getTime()
+        },
+        png: {
+          startedAt: pngStartedAt.toISOString(),
+          endedAt: pngEndedAt.toISOString(),
+          duration: pngEndedAt.getTime() - pngStartedAt.getTime()
+        }
+      },
+      warnings: request.metadata.warnings?.length ? request.metadata.warnings : undefined
+    }
+  } catch (error) {
+    console.error('[GroupReport] export failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}

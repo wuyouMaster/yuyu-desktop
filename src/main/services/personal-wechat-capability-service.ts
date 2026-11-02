@@ -1,0 +1,105 @@
+import {
+  canActivatePersonalWechatXsend,
+  type PersonalWechatSendCapability,
+  type PersonalWechatSendCapabilityState,
+  type PersonalWechatSenderStatus
+} from '../../shared/personal-wechat'
+import {
+  personalWechatSendService,
+  type PersonalWechatSendService
+} from './personal-wechat-send-service'
+
+/**
+ * Converts the detailed sender diagnostics into a small contract that other
+ * features can consume without knowing about OneBot, Hook or platform details.
+ */
+export class PersonalWechatCapabilityService {
+  constructor(private readonly sender: Pick<PersonalWechatSendService, 'getStatus'>) {}
+
+  async getPersonalWechatSendCapability(): Promise<PersonalWechatSendCapability> {
+    const senderStatus = await this.sender.getStatus()
+    return this.fromSenderStatus(senderStatus)
+  }
+
+  fromSenderStatus(senderStatus: PersonalWechatSenderStatus): PersonalWechatSendCapability {
+    const capabilities = {
+      text: Boolean(senderStatus.canSendText),
+      image: Boolean(senderStatus.canSendImage),
+      voice: Boolean(senderStatus.canSendVoice)
+    }
+    const hasAnyCapability = capabilities.text || capabilities.image || capabilities.voice
+    const status = this.mapState(senderStatus, hasAnyCapability)
+    const ready = hasAnyCapability && status === 'ready'
+    return {
+      supported: status !== 'unsupported',
+      ready,
+      status,
+      capabilities,
+      senderStatus,
+      message:
+        status === 'unsupported'
+          ? '微信消息发送目前仅支持 macOS 和 Windows'
+          : senderStatus.message ||
+            (status === 'needs_binding' || status === 'unconfigured'
+              ? '请先绑定个人微信'
+              : status === 'needs_profile'
+                ? '微信版本已匹配，请重新检测并加载兼容的 xsend profile'
+              : status === 'needs_verification'
+                ? '请先完成微信消息能力检测'
+                : status === 'ready'
+                  ? '个人微信已准备好发送日报'
+                  : senderStatus.error || '个人微信发送能力异常'),
+      ...(senderStatus.error ? { error: senderStatus.error } : {})
+    }
+  }
+
+  private mapState(
+    senderStatus: PersonalWechatSenderStatus,
+    hasAnyCapability: boolean
+  ): PersonalWechatSendCapabilityState {
+    if (senderStatus.platform === 'win32') {
+      if (hasAnyCapability) return 'ready'
+      if (!senderStatus.endpoint) return 'unconfigured'
+      if (senderStatus.state === 'error' && senderStatus.endpointReady) return 'error'
+      return 'needs_verification'
+    }
+    if (senderStatus.platform !== 'darwin' || senderStatus.state === 'unsupported_platform') {
+      return 'unsupported'
+    }
+    if (hasAnyCapability) return 'ready'
+    if (
+      senderStatus.textBackend !== 'onebot' &&
+      canActivatePersonalWechatXsend(senderStatus.xsend)
+    ) {
+      return 'needs_binding'
+    }
+    if (
+      senderStatus.xsend?.state === 'runtime_profile_unmatched'
+    ) {
+      return 'needs_profile'
+    }
+    if (senderStatus.state === 'error' || senderStatus.state === 'unsupported_version') {
+      return 'error'
+    }
+    const hasBinding = Boolean(senderStatus.boundWechatPid)
+    if (!hasBinding) {
+      return senderStatus.runtimeReady ? 'needs_binding' : 'unconfigured'
+    }
+    if (
+      senderStatus.state === 'hook_not_ready' ||
+      senderStatus.state === 'online' ||
+      senderStatus.state === 'starting' ||
+      senderStatus.state === 'stopped'
+    ) {
+      return 'needs_verification'
+    }
+    return 'error'
+  }
+}
+
+export const personalWechatCapabilityService = new PersonalWechatCapabilityService(
+  personalWechatSendService
+)
+
+export const getPersonalWechatSendCapability = (): Promise<PersonalWechatSendCapability> =>
+  personalWechatCapabilityService.getPersonalWechatSendCapability()

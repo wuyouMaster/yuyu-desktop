@@ -30,6 +30,7 @@ function fixture(data = Buffer.from([137, 80, 78, 71, 1])) {
           'media.open',
           'media.close',
           'media.find',
+          'media.locateAsset',
           'media.fileOpen',
           'media.decodeFile',
           'media.read',
@@ -132,4 +133,34 @@ describe('bounded media transfer consumer', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+})
+
+it('bounds raw voice reads, checks the digest and releases failed transfers', async () => {
+  const data = Buffer.from('synthetic-voice-bytes')
+  const f = fixture(data)
+  expect(await f.client.readFileAsync('fixture.dat', data.length)).toEqual(data)
+  await expect(f.client.readFileAsync('fixture.dat', data.length - 1)).rejects.toThrow(
+    'MEDIA_SIZE_LIMIT'
+  )
+  f.chunk.data = Buffer.alloc(data.length, 1).toString('base64')
+  await expect(f.client.readFileAsync('fixture.dat', data.length)).rejects.toThrow(
+    'MEDIA_DIGEST_MISMATCH'
+  )
+  expect(f.call.mock.calls.filter(([method]) => method === 'media.release')).toHaveLength(3)
+  f.client.close()
+})
+it('validates asset queries and rejects paths escaping the account', () => {
+  const f = fixture()
+  f.call.mockImplementation((method) =>
+    method === 'media.locateAsset' ? { path: '../secret' } : true
+  )
+  expect(() => f.client.locateAsset({ kind: 'file', name: 'fixture' })).toThrow(
+    'INVALID_RUNTIME_RESPONSE'
+  )
+  f.call.mockClear()
+  expect(() => f.client.locateAsset({ kind: 'video', hashes: ['not-a-hash'] })).toThrow(
+    'INVALID_ARGUMENT'
+  )
+  expect(f.call).not.toHaveBeenCalled()
+  f.client.close()
 })

@@ -1,0 +1,773 @@
+import type {
+  RuntimeInstallationStatus,
+  RuntimeInstallRequest,
+  RuntimeInstallProgress
+} from '../shared/runtime-installation'
+import type { ReadContext } from '../shared/source-context'
+import type { DingtalkLocalInspection } from '../shared/dingtalk-local'
+import type { TelegramLocalInspection } from '../shared/telegram-local'
+import type {
+  TelegramHistoryRequest,
+  TelegramHistoryResult,
+  TelegramHistoryQueueRequest,
+  TelegramHistoryQueueStatus,
+  TelegramMediaLoadRequest
+} from '../shared/telegram-history'
+import type { PriorityWatchRequest } from '../shared/priority-watch'
+import type { ConversationChatRequest, ConversationChatResult } from '../shared/conversation-chat'
+import type {
+  ConversationQuery,
+  MessageAroundQuery,
+  MessageQuery,
+  ProviderSnapshot,
+  SendRequest,
+  SendResult,
+  SaveAssetResult
+} from '../shared/data-source'
+import type { EntityId } from '../shared/entity-id'
+import type { Asset } from '../shared/domain-entities'
+import type {
+  NativeModuleCallRequest,
+  NativeModuleCallResult,
+  NativeModuleId,
+  NativeModuleResolution,
+  NativeModuleStatus
+} from '../shared/native-modules'
+import { contextBridge, ipcRenderer } from 'electron'
+import { electronAPI } from '@electron-toolkit/preload'
+import type { GroupReportExportRequest } from '../shared/group-report'
+import type { ReportTemplateOperationResult } from '../shared/report-template-package'
+import type { MessagesAroundResult } from '../shared/types'
+import type {
+  ReportTemplateCatalogInstallResult,
+  ReportTemplateCatalogResult
+} from '../shared/report-template-market'
+import type {
+  SaveGeneratedReportRequest,
+  UpdateGeneratedReportTemplateRequest
+} from '../shared/report-history'
+import type {
+  AIChatRequestOptions,
+  AiSearchExternalAuthorizationRequest,
+  AiSearchExternalAuthorizationResult,
+  AiSearchProviderStatus,
+  AIProviderConfig,
+  AIVisionTestRequest
+} from '../shared/ai-provider'
+import type {
+  ImageAnalysisRequest,
+  ImageAnalysisResponse,
+  ImageCandidate,
+  ImageCandidateQuery,
+  ImageInsight
+} from '../shared/image-insight'
+import type { SystemOcrCapability, SystemOcrRequest, SystemOcrResult } from '../shared/system-ocr'
+import type {
+  ImageTextIndexCountResult,
+  ImageTextIndexRepairResult,
+  ImageTextIndexStartOptions,
+  ImageTextIndexStatus
+} from '../shared/image-text-index'
+import type { AgentHubLogEntry, AgentHubStatus } from '../shared/agent-hub'
+import type {
+  AgentHubConversationMessage,
+  AgentHubConversationSummary
+} from '../shared/agent-hub-conversation'
+import type {
+  PersonalWechatGeneratedTtsVoiceRequest,
+  PersonalWechatGeneratedTtsVoiceResult,
+  PersonalWechatSendRequest,
+  PersonalWechatSendResult,
+  PersonalWechatSenderStatus,
+  PersonalWechatVoiceDiagnostic
+} from '../shared/personal-wechat'
+import type { PersonalWechatSendCapability } from '../shared/personal-wechat'
+import type {
+  ScheduledReportCreateInput,
+  ScheduledReportExecution,
+  ScheduledReportNotificationSettings,
+  ScheduledReportNotificationSettingsResult,
+  ScheduledReportResult,
+  ScheduledReportTask,
+  ScheduledReportUpdateInput
+} from '../shared/scheduled-report'
+import type {
+  PersonalWechatRuntimeDownloadResult,
+  PersonalWechatRuntimeProgressEvent,
+  PersonalWechatRuntimeStatus
+} from '../shared/personal-wechat-runtime'
+import type {
+  PersonalWechatVoiceEncodingEnvironment,
+  PersonalWechatVoiceEncodingEnvironmentResult
+} from '../shared/personal-wechat-voice-runtime'
+import type { AppLogEntry } from '../shared/app-log'
+import type { AppUpdateState } from '../shared/app-update'
+import type { GroupExitMonitorState } from '../shared/group-exit-monitor'
+import type { ActionLogEntry } from '../shared/action-log'
+import type { CacheClearScope, CacheSummary } from '../shared/cache'
+import type { ExportRequest, ExportJobProgress } from '../shared/export'
+import type { ImageDecoderSelectionResult, ImageDecoderStatus } from '../shared/image-decryption'
+import type { AccountDiscoveryResult } from '../shared/database-key'
+import type {
+  VoiceBatchConversationSummary,
+  VoiceBatchPreflight,
+  VoiceBatchProgress,
+  VoiceBatchRequest,
+  VoiceMessageReference,
+  VoiceModelDownloadResult,
+  VoiceModelProgressEvent,
+  VoiceModelStatus,
+  VoiceRecognitionResult,
+  VoiceTranscriptSnapshot
+} from '../shared/voice-recognition'
+import type {
+  AiSearchCancelResult,
+  AiSearchPipelineRequest,
+  AiSearchPipelineResult,
+  AiSearchProgressEvent
+} from '../shared/ai-search'
+import type {
+  AskWechatConfig,
+  AskWechatQueryRequest,
+  AskWechatQueryResult,
+  QueryAgentProgressEvent
+} from '../shared/query-agent'
+import type {
+  KnowledgeRuntimeStatus,
+  KnowledgeSearchIpcRequest,
+  KnowledgeSearchIpcResult
+} from '../shared/knowledge'
+import type {
+  PublishWechatShareCardRequest,
+  WechatShareServiceConfig
+} from '../shared/wechat-share-card'
+import type {
+  ListTextToSpeechVoicesRequest,
+  SaveTextToSpeechSettingsRequest,
+  SynthesizeTextToSpeechRequest
+} from '../shared/text-to-speech'
+
+// 渲染器的自定义 API
+const api = {
+  restartForRuntime: (): Promise<void> => ipcRenderer.invoke('runtime-installations:restart'),
+  getRuntimeInstallProgress: (): Promise<RuntimeInstallProgress | null> =>
+    ipcRenderer.invoke('runtime-installations:progress'),
+  cancelRuntimeInstall: (): Promise<void> => ipcRenderer.invoke('runtime-installations:cancel'),
+  listRuntimeInstallations: (): Promise<RuntimeInstallationStatus[]> =>
+    ipcRenderer.invoke('runtime-installations:list'),
+  installRuntime: (request: RuntimeInstallRequest): Promise<void> =>
+    ipcRenderer.invoke('runtime-installations:install', request),
+  listNativeModules: (): Promise<NativeModuleStatus[]> => ipcRenderer.invoke('native-modules:list'),
+  resolveNativeModule: (id: NativeModuleId): Promise<NativeModuleResolution> =>
+    ipcRenderer.invoke('native-modules:resolve', id),
+  invokeNativeModule: <T = unknown>(
+    request: NativeModuleCallRequest
+  ): Promise<NativeModuleCallResult<T>> => ipcRenderer.invoke('native-modules:invoke', request),
+  writeAppLog: (entry: AppLogEntry) => ipcRenderer.invoke('app-log:write', entry),
+  getAppLogPath: () => ipcRenderer.invoke('app-log:getPath'),
+  revealAppLog: () => ipcRenderer.invoke('app-log:reveal'),
+  getAppUpdateState: (): Promise<AppUpdateState> => ipcRenderer.invoke('app-update:getState'),
+  checkAppUpdate: () => ipcRenderer.invoke('app-update:check'),
+  downloadAppUpdate: () => ipcRenderer.invoke('app-update:download'),
+  installAppUpdate: () => ipcRenderer.invoke('app-update:install'),
+  openAppUpdateDownloadPage: () => ipcRenderer.invoke('app-update:openDownloadPage'),
+  onAppUpdateState: (callback: (state: AppUpdateState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: AppUpdateState): void =>
+      callback(state)
+    ipcRenderer.on('app-update:state', listener)
+    return () => ipcRenderer.removeListener('app-update:state', listener)
+  },
+  getCacheSummary: (): Promise<CacheSummary> => ipcRenderer.invoke('cache:getSummary'),
+  clearCache: (scope: CacheClearScope): Promise<CacheSummary> =>
+    ipcRenderer.invoke('cache:clear', scope),
+  openKnowledgeDirectory: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('cache:openKnowledgeDirectory'),
+  initDb: (key: string, accountRoot: string) => ipcRenderer.invoke('db:init', key, accountRoot),
+  discoverAccounts: (inputPath: string): Promise<AccountDiscoveryResult> =>
+    ipcRenderer.invoke('accounts:discover', inputPath),
+  getBootstrapCache: () => ipcRenderer.invoke('db:getBootstrapCache'),
+  getStartupCache: () => ipcRenderer.invoke('db:getStartupCache'),
+  getContacts: (filter?: string) => ipcRenderer.invoke('db:getContacts', filter),
+  getContactAvatars: (usernames: string[], options?: { refresh?: boolean }) =>
+    ipcRenderer.invoke('db:getContactAvatars', usernames, options),
+  getCachedMessages: (userMd5: string, startTime?: number, endTime?: number) =>
+    ipcRenderer.invoke('db:getCachedMessages', userMd5, startTime, endTime),
+  getCachedMessagePage: (userMd5: string, startTime?: number, endTime?: number) =>
+    ipcRenderer.invoke('db:getCachedMessagePage', userMd5, startTime, endTime),
+  getPriorityWatchPage: (request: PriorityWatchRequest) =>
+    ipcRenderer.invoke('db:getPriorityWatchPage', request),
+  getMessages: (
+    userMd5: string,
+    startTime?: number,
+    endTime?: number,
+    options?: { limit?: number }
+  ) => ipcRenderer.invoke('db:getMessages', userMd5, startTime, endTime, options),
+  inspectDingtalkLocalSource: (): Promise<DingtalkLocalInspection> =>
+    ipcRenderer.invoke('source:inspectDingtalkLocal'),
+  inspectTelegramLocalSource: (): Promise<TelegramLocalInspection> =>
+    ipcRenderer.invoke('source:inspectTelegramLocal'),
+  connectTelegramLocalSource: (slot: number, account: string) =>
+    ipcRenderer.invoke('source:connectTelegramLocal', slot, account),
+  loadTelegramMedia: (request: TelegramMediaLoadRequest): Promise<Asset> =>
+    ipcRenderer.invoke('source:loadTelegramMedia', request),
+  loadTelegramHistory: (request: TelegramHistoryRequest): Promise<TelegramHistoryResult> =>
+    ipcRenderer.invoke('source:loadTelegramHistory', request),
+  startTelegramHistoryQueue: (
+    request: TelegramHistoryQueueRequest
+  ): Promise<TelegramHistoryQueueStatus> =>
+    ipcRenderer.invoke('source:startTelegramHistoryQueue', request),
+  getTelegramHistoryQueue: (
+    request: TelegramHistoryQueueRequest
+  ): Promise<TelegramHistoryQueueStatus | undefined> =>
+    ipcRenderer.invoke('source:getTelegramHistoryQueue', request),
+  cancelTelegramHistoryQueue: (
+    request: TelegramHistoryQueueRequest
+  ): Promise<TelegramHistoryQueueStatus> =>
+    ipcRenderer.invoke('source:cancelTelegramHistoryQueue', request),
+  refreshDingtalkSource: () => ipcRenderer.invoke('source:refreshDingtalk'),
+  selectTelegramExport: (): Promise<{ canceled: boolean; path?: string }> =>
+    ipcRenderer.invoke('source:selectTelegramExport'),
+  importTelegramSource: (filePath: string) => ipcRenderer.invoke('source:importTelegram', filePath),
+  listUnifiedAccounts: () => ipcRenderer.invoke('entity:listAccounts'),
+  listUnifiedConversations: (query?: ConversationQuery) =>
+    ipcRenderer.invoke('entity:listConversations', query),
+  listUnifiedParticipants: (accountId: EntityId, context?: ReadContext) =>
+    ipcRenderer.invoke('entity:listParticipants', accountId, ...(context ? [context] : [])),
+  listUnifiedMemberships: (conversationId: EntityId, context?: ReadContext) =>
+    ipcRenderer.invoke('entity:listMemberships', conversationId, ...(context ? [context] : [])),
+  listUnifiedMessages: (query: MessageQuery) => ipcRenderer.invoke('entity:listMessages', query),
+  listUnifiedMessagesAround: (query: MessageAroundQuery) =>
+    ipcRenderer.invoke('entity:listMessagesAround', query),
+  resolveUnifiedAsset: (assetId: EntityId, context?: ReadContext) =>
+    ipcRenderer.invoke('entity:resolveAsset', assetId, ...(context ? [context] : [])),
+  saveUnifiedAsset: (assetId: EntityId, context?: ReadContext): Promise<SaveAssetResult> =>
+    ipcRenderer.invoke('entity:saveAsset', assetId, ...(context ? [context] : [])),
+  getUnifiedProviderSnapshot: (): Promise<ProviderSnapshot | undefined> =>
+    ipcRenderer.invoke('entity:getProviderSnapshot'),
+  sendUnifiedMessage: (request: SendRequest): Promise<SendResult> =>
+    ipcRenderer.invoke('entity:sendMessage', request),
+  /**
+   * 跳转到证据的锚点读取：按稳定消息 id 在有界时间窗口内精确定位，
+   * 返回 `found` 让 UI 能诚实降级（而不是假装跳成功）。
+   */
+  getMessagesAround: (
+    userMd5: string,
+    messageId: string,
+    anchorSeconds?: number,
+    radiusSeconds?: number
+  ): Promise<MessagesAroundResult> =>
+    ipcRenderer.invoke('db:getMessagesAround', userMd5, messageId, anchorSeconds, radiusSeconds),
+  getGroupSnapshot: (userMd5: string) => ipcRenderer.invoke('db:getGroupSnapshot', userMd5),
+  getGroupExitMonitorState: (): Promise<GroupExitMonitorState> =>
+    ipcRenderer.invoke('group-exit-monitor:getState'),
+  setGroupExitMonitorEnabled: (enabled: boolean): Promise<GroupExitMonitorState> =>
+    ipcRenderer.invoke('group-exit-monitor:setEnabled', enabled),
+  setGroupExitMonitorGroups: (
+    roomIds: string[],
+    notificationRoomIds?: string[]
+  ): Promise<GroupExitMonitorState> =>
+    notificationRoomIds === undefined
+      ? ipcRenderer.invoke('group-exit-monitor:setGroups', roomIds)
+      : ipcRenderer.invoke('group-exit-monitor:setGroups', roomIds, notificationRoomIds),
+  setGroupExitMonitorNotificationTemplate: (template: string): Promise<GroupExitMonitorState> =>
+    ipcRenderer.invoke('group-exit-monitor:setTemplate', template),
+  checkGroupExitMonitorNow: (): Promise<GroupExitMonitorState> =>
+    ipcRenderer.invoke('group-exit-monitor:checkNow'),
+  clearGroupExitMonitorEvents: (): Promise<GroupExitMonitorState> =>
+    ipcRenderer.invoke('group-exit-monitor:clearEvents'),
+  resendGroupExitMonitorEvent: (eventId: string): Promise<GroupExitMonitorState> =>
+    ipcRenderer.invoke('group-exit-monitor:resendEvent', eventId),
+  markGroupExitMonitorRead: (readAt?: number): Promise<GroupExitMonitorState> =>
+    ipcRenderer.invoke('group-exit-monitor:markRead', readAt),
+  listWechatActionLogs: (): Promise<ActionLogEntry[]> =>
+    ipcRenderer.invoke('wechat-action-log:list'),
+  onGroupExitMonitorState: (callback: (state: GroupExitMonitorState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: GroupExitMonitorState): void =>
+      callback(state)
+    ipcRenderer.on('group-exit-monitor:state', listener)
+    return () => ipcRenderer.removeListener('group-exit-monitor:state', listener)
+  },
+  search: (keyword: string) => ipcRenderer.invoke('db:search', keyword),
+  searchKnowledge: (request: KnowledgeSearchIpcRequest): Promise<KnowledgeSearchIpcResult> =>
+    ipcRenderer.invoke('knowledge:search', request),
+  runAiSearch: (request: AiSearchPipelineRequest): Promise<AiSearchPipelineResult> =>
+    ipcRenderer.invoke('ai-search:run', request),
+  cancelAiSearch: (requestId: string): Promise<AiSearchCancelResult> =>
+    ipcRenderer.invoke('ai-search:cancel', requestId),
+  onAiSearchProgress: (callback: (progress: AiSearchProgressEvent) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: AiSearchProgressEvent): void =>
+      callback(progress)
+    ipcRenderer.on('ai-search:progress', listener)
+    return () => ipcRenderer.removeListener('ai-search:progress', listener)
+  },
+  getAskWechatConfig: (): Promise<AskWechatConfig> => ipcRenderer.invoke('ask-wechat:getConfig'),
+  runConversationChat: (request: ConversationChatRequest): Promise<ConversationChatResult> =>
+    ipcRenderer.invoke('conversation-chat:run', request),
+  cancelConversationChat: (requestId: string): Promise<boolean> =>
+    ipcRenderer.invoke('conversation-chat:cancel', requestId),
+  onConversationChatDelta: (callback: (requestId: string, delta: string) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, requestId: string, delta: string): void =>
+      callback(requestId, delta)
+    ipcRenderer.on('conversation-chat:delta', listener)
+    return () => ipcRenderer.removeListener('conversation-chat:delta', listener)
+  },
+  runAgentTask: (request: AskWechatQueryRequest): Promise<AskWechatQueryResult> =>
+    ipcRenderer.invoke('agent-runtime:run', request),
+  cancelAgentTask: (requestId: string): Promise<boolean> =>
+    ipcRenderer.invoke('agent-runtime:cancel', requestId),
+  forgetAgentSession: (scope: AskWechatQueryRequest['scope']): Promise<void> =>
+    ipcRenderer.invoke('agent-runtime:forget', scope),
+  runAskWechatQuery: (request: AskWechatQueryRequest): Promise<AskWechatQueryResult> =>
+    ipcRenderer.invoke('ask-wechat:query', request),
+  /**
+   * 订阅「问问微信」的真实进度事件。
+   *
+   * 事件带 requestId：UI 必须只认自己那一次请求，否则用户连问两次时阶段文案会串台。
+   */
+  onAskWechatProgress: (callback: (requestId: string, event: QueryAgentProgressEvent) => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      requestId: string,
+      progress: QueryAgentProgressEvent
+    ): void => callback(requestId, progress)
+    ipcRenderer.on('ask-wechat:progress', listener)
+    return () => ipcRenderer.removeListener('ask-wechat:progress', listener)
+  },
+  forgetAskWechatConversation: (): Promise<void> =>
+    ipcRenderer.invoke('ask-wechat:forgetConversation'),
+  getKnowledgeStatus: (): Promise<KnowledgeRuntimeStatus> =>
+    ipcRenderer.invoke('knowledge:getStatus'),
+  startKnowledgeIndex: (): Promise<KnowledgeRuntimeStatus> =>
+    ipcRenderer.invoke('knowledge:startIndex'),
+  /**
+   * 取消正在跑的索引 pass。返回 `cancelled: false` 表示请求时已经没有可取消的任务
+   * （例如刚好自己跑完了）——UI 必须如实反映，而不是无条件显示"已取消"。
+   */
+  cancelKnowledgeIndex: (): Promise<{ cancellable: boolean; cancelled: boolean }> =>
+    ipcRenderer.invoke('knowledge:cancelIndex'),
+  onKnowledgeStatus: (callback: (status: KnowledgeRuntimeStatus) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: KnowledgeRuntimeStatus): void =>
+      callback(status)
+    ipcRenderer.on('knowledge:status', listener)
+    return () => ipcRenderer.removeListener('knowledge:status', listener)
+  },
+  aiChat: (messages: { role: string; content: string }[], options?: AIChatRequestOptions) =>
+    ipcRenderer.invoke('ai:chat', messages, options),
+  listAIProviders: () => ipcRenderer.invoke('ai:listProviders'),
+  getAIRuntimeConfig: () => ipcRenderer.invoke('ai:getRuntimeConfig'),
+  getAIVisionRuntimeConfig: () => ipcRenderer.invoke('ai:getVisionRuntimeConfig'),
+  getAiSearchProviderStatus: (): Promise<AiSearchProviderStatus> =>
+    ipcRenderer.invoke('ai-search:getProviderStatus'),
+  authorizeAiSearchExternalProvider: (
+    request: AiSearchExternalAuthorizationRequest
+  ): Promise<AiSearchExternalAuthorizationResult> =>
+    ipcRenderer.invoke('ai-search:authorizeExternalProvider', request),
+  saveAIProvider: (provider: AIProviderConfig) => ipcRenderer.invoke('ai:saveProvider', provider),
+  deleteAIProvider: (providerId: string) => ipcRenderer.invoke('ai:deleteProvider', providerId),
+  setDefaultAIProvider: (providerId: string) =>
+    ipcRenderer.invoke('ai:setDefaultProvider', providerId),
+  testAIProvider: (providerId: string) => ipcRenderer.invoke('ai:testProvider', providerId),
+  testAIVision: (request: AIVisionTestRequest) => ipcRenderer.invoke('ai:testVision', request),
+  getTextToSpeechSettings: () => ipcRenderer.invoke('tts:getSettings'),
+  saveTextToSpeechSettings: (request: SaveTextToSpeechSettingsRequest) =>
+    ipcRenderer.invoke('tts:saveSettings', request),
+  listTextToSpeechVoices: (request?: ListTextToSpeechVoicesRequest) =>
+    ipcRenderer.invoke('tts:listVoices', request),
+  synthesizeTextToSpeech: (request: SynthesizeTextToSpeechRequest) =>
+    ipcRenderer.invoke('tts:synthesize', request),
+  removeGeneratedTextToSpeechAudio: (filePath: string) =>
+    ipcRenderer.invoke('tts:removeGeneratedAudio', filePath),
+  openFishAudioApiKeys: () => ipcRenderer.invoke('tts:openApiKeys'),
+  copyImage: (base64String) => ipcRenderer.invoke('copy-image', base64String),
+  getVoiceData: (sessionId: string, localId: number, createTime: number, svrId?: string | number) =>
+    ipcRenderer.invoke('db:getVoiceData', sessionId, localId, createTime, svrId),
+  showVoiceSourceContextMenu: (reference: VoiceMessageReference) =>
+    ipcRenderer.invoke('voice:showSourceContextMenu', reference),
+  getVoiceModelStatus: (): Promise<VoiceModelStatus> => ipcRenderer.invoke('voice:getModelStatus'),
+  downloadVoiceModel: (): Promise<VoiceModelDownloadResult> =>
+    ipcRenderer.invoke('voice:downloadModel'),
+  cancelVoiceModelDownload: (): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('voice:cancelModelDownload'),
+  removeVoiceModel: (): Promise<VoiceModelStatus> => ipcRenderer.invoke('voice:removeModel'),
+  openVoiceModelDirectory: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('voice:openModelDirectory'),
+  recognizeVoice: (
+    reference: VoiceMessageReference,
+    options?: { force?: boolean }
+  ): Promise<VoiceRecognitionResult> =>
+    options === undefined
+      ? ipcRenderer.invoke('voice:recognize', reference)
+      : ipcRenderer.invoke('voice:recognize', reference, options),
+  getVoiceTranscriptSnapshot: (
+    reference: VoiceMessageReference
+  ): Promise<VoiceTranscriptSnapshot> =>
+    ipcRenderer.invoke('voice:getTranscriptSnapshot', reference),
+  cancelVoiceRecognition: (reference: VoiceMessageReference): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('voice:cancelRecognition', reference),
+  getVoiceBatchPreflight: (request: VoiceBatchRequest): Promise<VoiceBatchPreflight> =>
+    ipcRenderer.invoke('voice:getBatchPreflight', request),
+  getVoiceBatchConversationSummaries: (
+    request: VoiceBatchRequest
+  ): Promise<VoiceBatchConversationSummary[]> =>
+    ipcRenderer.invoke('voice:getBatchConversationSummaries', request),
+  getVoiceBatchProgress: (): Promise<VoiceBatchProgress | undefined> =>
+    ipcRenderer.invoke('voice:getBatchProgress'),
+  startVoiceBatch: (request: VoiceBatchRequest): Promise<VoiceBatchProgress> =>
+    ipcRenderer.invoke('voice:startBatch', request),
+  cancelVoiceBatch: (): Promise<{ success: boolean }> => ipcRenderer.invoke('voice:cancelBatch'),
+  retryFailedVoiceBatch: (): Promise<VoiceBatchProgress> =>
+    ipcRenderer.invoke('voice:retryFailedBatch'),
+  onVoiceBatchProgress: (callback: (progress: VoiceBatchProgress) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: VoiceBatchProgress): void =>
+      callback(progress)
+    ipcRenderer.on('voice:batchProgress', listener)
+    return () => ipcRenderer.removeListener('voice:batchProgress', listener)
+  },
+  onVoiceModelProgress: (callback: (status: VoiceModelProgressEvent) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: VoiceModelProgressEvent): void =>
+      callback(status)
+    ipcRenderer.on('voice:modelProgress', listener)
+    return () => ipcRenderer.removeListener('voice:modelProgress', listener)
+  },
+  parseMessage: (content: string, messageType: number) =>
+    ipcRenderer.invoke('db:parseMessage', content, messageType),
+  getImage: (
+    imageMd5?: string,
+    imageDatNameOrThumb?: string | boolean,
+    sessionId?: string,
+    options?: {
+      force?: boolean
+      preferThumbnail?: boolean
+      priority?: number
+      includeData?: boolean
+    }
+  ) => ipcRenderer.invoke('db:getImage', imageMd5, imageDatNameOrThumb, sessionId, options),
+  getVideo: (
+    hashes: string[],
+    options?: {
+      createTime?: number
+      byteLength?: number
+      duration?: number
+      width?: number
+      height?: number
+    }
+  ) => ipcRenderer.invoke('db:getVideo', hashes, options),
+  getSticker: (cdnUrl?: string, md5?: string, options?: { encryptUrl?: string; aeskey?: string }) =>
+    ipcRenderer.invoke('db:getSticker', cdnUrl, md5, options),
+  startExport: (request: ExportRequest) => ipcRenderer.invoke('export:start', request),
+  cancelExport: (jobId: string) => ipcRenderer.invoke('export:cancel', jobId),
+  revealExport: (path: string) => ipcRenderer.invoke('export:reveal', path),
+  selectExportDirectory: () => ipcRenderer.invoke('export:selectDirectory'),
+  onExportProgress: (callback: (progress: ExportJobProgress) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: ExportJobProgress): void =>
+      callback(progress)
+    ipcRenderer.on('export:progress', listener)
+    return () => ipcRenderer.removeListener('export:progress', listener)
+  },
+  exportGroupReport: (request: GroupReportExportRequest) =>
+    ipcRenderer.invoke('report:export', request),
+  listReportTemplates: () => ipcRenderer.invoke('report-template:list'),
+  installReportTemplate: (packagePath: string): Promise<ReportTemplateOperationResult> =>
+    ipcRenderer.invoke('report-template:install', packagePath),
+  uninstallReportTemplate: (id: string, version: string): Promise<ReportTemplateOperationResult> =>
+    ipcRenderer.invoke('report-template:uninstall', id, version),
+  listReportTemplateCatalog: (): Promise<ReportTemplateCatalogResult> =>
+    ipcRenderer.invoke('report-template-market:list'),
+  installReportTemplateFromCatalog: (
+    id: string,
+    version: string
+  ): Promise<ReportTemplateCatalogInstallResult> =>
+    ipcRenderer.invoke('report-template-market:install', id, version),
+  listGeneratedReports: () => ipcRenderer.invoke('report:listGenerated'),
+  saveGeneratedReport: (request: SaveGeneratedReportRequest) =>
+    ipcRenderer.invoke('report:saveGenerated', request),
+  updateGeneratedReportTemplate: (request: UpdateGeneratedReportTemplateRequest) =>
+    ipcRenderer.invoke('report:updateGeneratedTemplate', request),
+  deleteGeneratedReport: (reportId: string) =>
+    ipcRenderer.invoke('report:deleteGenerated', reportId),
+  revealGroupReport: (filePath: string) => ipcRenderer.invoke('report:reveal', filePath),
+  getWechatShareConfig: () => ipcRenderer.invoke('wechat-share:getConfig'),
+  saveWechatShareConfig: (config: WechatShareServiceConfig) =>
+    ipcRenderer.invoke('wechat-share:saveConfig', config),
+  publishWechatShareCard: (request: PublishWechatShareCardRequest) =>
+    ipcRenderer.invoke('wechat-share:publish', request),
+  getSavedDbKey: (accountRoot: string) => ipcRenderer.invoke('key:getSavedDbKey', accountRoot),
+  getDatabaseKeyEnvironment: () => ipcRenderer.invoke('key:getEnvironment'),
+  readDatabaseKeyClipboard: () => ipcRenderer.invoke('key:readClipboardDbKey'),
+  installIntelMacKeyRuntime: () => ipcRenderer.invoke('key:installIntelMacRuntime'),
+  autoGetDbKey: (accountRoot: string, options?: { save?: boolean }) =>
+    ipcRenderer.invoke('key:autoGetDbKey', accountRoot, options),
+  autoGetImageKey: (options?: { save?: boolean }) =>
+    ipcRenderer.invoke('key:autoGetImageKey', options),
+  getImageKeyConfig: () => ipcRenderer.invoke('image:getConfig'),
+  getImageDecryptionStatus: () => ipcRenderer.invoke('image:getStatus'),
+  selectImageDecoder: (): Promise<ImageDecoderSelectionResult> =>
+    ipcRenderer.invoke('image:selectDecoder'),
+  getImageDecoderStatus: (): Promise<ImageDecoderStatus> =>
+    ipcRenderer.invoke('image:getDecoderStatus'),
+  openImageDecoderDownload: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('image:openDecoderDownload'),
+  saveImageKeyConfig: (request) => ipcRenderer.invoke('image:saveConfig', request),
+  testImageDecryption: (request) => ipcRenderer.invoke('image:testConfig', request),
+  clearImageKeyConfig: () => ipcRenderer.invoke('image:clearConfig'),
+  pasteAndSaveDbKey: (accountRoot: string) =>
+    ipcRenderer.invoke('key:pasteAndSaveDbKey', accountRoot),
+  saveDbKey: (accountRoot: string, key: string) =>
+    ipcRenderer.invoke('key:saveDbKey', accountRoot, key),
+  clearSavedDbKey: (accountRoot: string) => ipcRenderer.invoke('key:clearSavedDbKey', accountRoot),
+  onWcdbChange: (callback: (payload: { type: string; json: string }) => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: { type: string; json: string }
+    ): void => callback(payload)
+    ipcRenderer.on('wcdb-change', listener)
+    return () => ipcRenderer.removeListener('wcdb-change', listener)
+  },
+  onDbKeyStatus: (callback: (payload: { message: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { message: string }): void =>
+      callback(payload)
+    ipcRenderer.on('key:dbKeyStatus', listener)
+    return () => ipcRenderer.removeListener('key:dbKeyStatus', listener)
+  },
+  onImageKeyStatus: (callback: (payload: { message: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { message: string }): void =>
+      callback(payload)
+    ipcRenderer.on('key:imageKeyStatus', listener)
+    return () => ipcRenderer.removeListener('key:imageKeyStatus', listener)
+  },
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
+  getSelf: () => ipcRenderer.invoke('settings:getSelf'),
+  testConnection: (key: string, accountRoot?: string) =>
+    ipcRenderer.invoke('db:testConnection', key, accountRoot),
+  reopenWithRoot: (accountRoot: string) => ipcRenderer.invoke('db:reopenWithRoot', accountRoot),
+  selectDbRoot: () => ipcRenderer.invoke('settings:selectDbRoot'),
+  openAccountRoot: () => ipcRenderer.invoke('settings:openAccountRoot'),
+  disconnectDb: (options?: { closeNative?: boolean }) =>
+    ipcRenderer.invoke('db:disconnect', options),
+  apiStatus: () => ipcRenderer.invoke('api:getStatus'),
+  apiTokenStatus: () => ipcRenderer.invoke('api:tokenStatus'),
+  revealApiToken: () => ipcRenderer.invoke('api:revealToken'),
+  copyApiToken: () => ipcRenderer.invoke('api:copyToken'),
+  rotateApiToken: () => ipcRenderer.invoke('api:rotateToken'),
+  apiStart: (host?: string, port?: number) => ipcRenderer.invoke('api:start', host, port),
+  apiStop: () => ipcRenderer.invoke('api:stop'),
+  apiToggle: (enabled: boolean) => ipcRenderer.invoke('api:toggle', enabled),
+  getReaderSkillStatus: () => ipcRenderer.invoke('api:skillStatus'),
+  readReaderSkill: () => ipcRenderer.invoke('api:readSkill'),
+  revealReaderSkill: () => ipcRenderer.invoke('api:revealSkill'),
+  openReaderSkillGithub: () => ipcRenderer.invoke('api:openSkillGithub'),
+  testLocalApiRequest: (request) => ipcRenderer.invoke('api:testLocalRequest', request),
+  copyLocalApiCurl: (request) => ipcRenderer.invoke('api:copyCurl', request),
+  copyText: (text: string) => ipcRenderer.invoke('api:copyText', text),
+  // ============================================================
+  // AI 图片理解基础设施(ImageInsightService)
+  // ============================================================
+  imageListCandidates: (
+    query: ImageCandidateQuery
+  ): Promise<{
+    success: boolean
+    candidates: ImageCandidate[]
+    error?: string
+  }> => ipcRenderer.invoke('image:listCandidates', query),
+  imageAnalyze: (request: ImageAnalysisRequest): Promise<ImageAnalysisResponse> =>
+    ipcRenderer.invoke('image:analyze', request),
+  getImageInsight: (imageHash: string): Promise<{ success: boolean; insight?: ImageInsight }> =>
+    ipcRenderer.invoke('image:getInsight', imageHash),
+  listImageInsights: (
+    sessionId: string,
+    limit?: number
+  ): Promise<{ success: boolean; insights: ImageInsight[] }> =>
+    ipcRenderer.invoke('image:listInsights', sessionId, limit),
+  // 本地图片文字识别（System OCR，本地 Runtime，非 AI Provider）
+  getSystemOcrCapability: (): Promise<SystemOcrCapability> =>
+    ipcRenderer.invoke('system-ocr:getCapability'),
+  recognizeLocalImageText: (request: SystemOcrRequest): Promise<SystemOcrResult> =>
+    ipcRenderer.invoke('system-ocr:recognize', request),
+
+  // 图片文字索引（微信图片 → 本地解密 → System OCR → 派生文本 → Knowledge）
+  getImageTextIndexStatus: (): Promise<ImageTextIndexStatus> =>
+    ipcRenderer.invoke('image-text-index:getStatus'),
+  /** 点击索引前的快速统计（SQL COUNT，不解密图片）。 */
+  countImageMessages: (sinceMs?: number): Promise<ImageTextIndexCountResult> =>
+    ipcRenderer.invoke('image-text-index:count', sinceMs),
+  startImageTextIndex: (
+    options?: ImageTextIndexStartOptions
+  ): Promise<{ started: boolean; state: string }> =>
+    ipcRenderer.invoke('image-text-index:start', options),
+  pauseImageTextIndex: (): Promise<{ paused: boolean; state: string }> =>
+    ipcRenderer.invoke('image-text-index:pause'),
+  resumeImageTextIndex: (
+    options?: ImageTextIndexStartOptions
+  ): Promise<{ started: boolean; state: string }> =>
+    ipcRenderer.invoke('image-text-index:resume', options),
+  cancelImageTextIndex: (): Promise<{ cancellable: boolean; cancelled: boolean }> =>
+    ipcRenderer.invoke('image-text-index:cancel'),
+  clearImageTextIndex: (): Promise<{ removed: boolean; removedBytes: number }> =>
+    ipcRenderer.invoke('image-text-index:clear'),
+  /** 只重置失败记录（成功记录与其它数据不动），供"修好代码后重跑"。 */
+  resetImageTextIndexFailures: (): Promise<{ reset: number }> =>
+    ipcRenderer.invoke('image-text-index:resetFailures'),
+  /**
+   * 派生索引修复：只重建 Knowledge 里的图片派生条目与 FTS。
+   *
+   * 已有的 OCR 结果（L1）一条都不动 —— 修复索引问题永远不该让几万张图片重算。
+   */
+  repairImageTextIndex: (): Promise<ImageTextIndexRepairResult> =>
+    ipcRenderer.invoke('image-text-index:repair'),
+  onImageTextIndexStatus: (callback: (status: ImageTextIndexStatus) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: ImageTextIndexStatus): void =>
+      callback(status)
+    ipcRenderer.on('image-text-index:status', listener)
+    return () => ipcRenderer.removeListener('image-text-index:status', listener)
+  },
+  getPersonalWechatSenderStatus: (): Promise<PersonalWechatSenderStatus> =>
+    ipcRenderer.invoke('wechat-personal:getStatus'),
+  getPersonalWechatSendCapability: (): Promise<PersonalWechatSendCapability> =>
+    ipcRenderer.invoke('wechat-personal:getSendCapability'),
+  getPersonalWechatKeepOneBotProcess: (): Promise<boolean> =>
+    ipcRenderer.invoke('wechat-personal:getKeepProcess'),
+  setPersonalWechatKeepOneBotProcess: (keep: boolean): Promise<boolean> =>
+    ipcRenderer.invoke('wechat-personal:setKeepProcess', keep),
+  checkPersonalWechatSenderStatus: (port?: string): Promise<PersonalWechatSenderStatus> =>
+    ipcRenderer.invoke('wechat-personal:checkStatus', port),
+  checkPersonalWechatVoiceEncodingEnvironment:
+    (): Promise<PersonalWechatVoiceEncodingEnvironment> =>
+      ipcRenderer.invoke('wechat-personal:checkVoiceEnvironment'),
+  installPersonalWechatPilk: (): Promise<PersonalWechatVoiceEncodingEnvironmentResult> =>
+    ipcRenderer.invoke('wechat-personal:installPilk'),
+  openPersonalWechatVoicePythonDownload: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('wechat-personal:openVoicePythonDownload'),
+  openPersonalWechatVoiceFfmpegDownload: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('wechat-personal:openVoiceFfmpegDownload'),
+  getPersonalWechatRuntimeStatus: (): Promise<PersonalWechatRuntimeStatus> =>
+    ipcRenderer.invoke('wechat-personal:getRuntimeStatus'),
+  downloadPersonalWechatRuntime: (): Promise<PersonalWechatRuntimeDownloadResult> =>
+    ipcRenderer.invoke('wechat-personal:downloadRuntime'),
+  cancelPersonalWechatRuntimeDownload: (): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('wechat-personal:cancelRuntimeDownload'),
+  removePersonalWechatRuntime: (): Promise<PersonalWechatRuntimeStatus> =>
+    ipcRenderer.invoke('wechat-personal:removeRuntime'),
+  openPersonalWechatRuntimeDirectory: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('wechat-personal:openRuntimeDirectory'),
+  onPersonalWechatRuntimeProgress: (
+    callback: (status: PersonalWechatRuntimeProgressEvent) => void
+  ) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      status: PersonalWechatRuntimeProgressEvent
+    ): void => callback(status)
+    ipcRenderer.on('wechat-personal:runtimeProgress', listener)
+    return () => ipcRenderer.removeListener('wechat-personal:runtimeProgress', listener)
+  },
+  rebindPersonalWechatSender: (): Promise<PersonalWechatSenderStatus> =>
+    ipcRenderer.invoke('wechat-personal:rebind'),
+  sendGeneratedTtsVoice: (
+    request: PersonalWechatGeneratedTtsVoiceRequest
+  ): Promise<PersonalWechatGeneratedTtsVoiceResult> =>
+    ipcRenderer.invoke('wechat-personal:sendGeneratedTtsVoice', request),
+  // 日报图片发送仍使用现有业务发送链路；普通聊天 Composer 不暴露此入口。
+  sendPersonalWechatMessage: (
+    request: PersonalWechatSendRequest
+  ): Promise<PersonalWechatSendResult> => ipcRenderer.invoke('wechat-personal:send', request),
+  listScheduledReports: (): Promise<ScheduledReportTask[]> =>
+    ipcRenderer.invoke('scheduled-report:list'),
+  listScheduledReportExecutions: (taskId?: string): Promise<ScheduledReportExecution[]> =>
+    ipcRenderer.invoke('scheduled-report:listExecutions', taskId),
+  getScheduledReportNotificationSettings: (): Promise<ScheduledReportNotificationSettings> =>
+    ipcRenderer.invoke('scheduled-report:getNotificationSettings'),
+  setScheduledReportNotificationEnabled: (
+    enabled: boolean
+  ): Promise<ScheduledReportNotificationSettingsResult> =>
+    ipcRenderer.invoke('scheduled-report:setNotificationEnabled', enabled),
+  createScheduledReport: (
+    request: ScheduledReportCreateInput
+  ): Promise<ScheduledReportResult<ScheduledReportTask>> =>
+    ipcRenderer.invoke('scheduled-report:create', request),
+  updateScheduledReport: (
+    taskId: string,
+    request: ScheduledReportUpdateInput
+  ): Promise<ScheduledReportResult<ScheduledReportTask>> =>
+    ipcRenderer.invoke('scheduled-report:update', taskId, request),
+  deleteScheduledReport: (taskId: string): Promise<ScheduledReportResult<{ deletedId: string }>> =>
+    ipcRenderer.invoke('scheduled-report:delete', taskId),
+  setScheduledReportEnabled: (
+    taskId: string,
+    enabled: boolean
+  ): Promise<ScheduledReportResult<ScheduledReportTask>> =>
+    ipcRenderer.invoke('scheduled-report:setEnabled', taskId, enabled),
+  runScheduledReportNow: (
+    taskId: string
+  ): Promise<ScheduledReportResult<ScheduledReportExecution>> =>
+    ipcRenderer.invoke('scheduled-report:runNow', taskId),
+  retryScheduledReportSend: (
+    executionId: string
+  ): Promise<ScheduledReportResult<ScheduledReportExecution>> =>
+    ipcRenderer.invoke('scheduled-report:retrySend', executionId),
+  testScheduledReportErrorNotification: (
+    taskId: string
+  ): Promise<ScheduledReportResult<ScheduledReportExecution>> =>
+    ipcRenderer.invoke('scheduled-report:testErrorNotification', taskId),
+  getPersonalWechatVoiceDiagnostic: (): Promise<PersonalWechatVoiceDiagnostic | null> =>
+    ipcRenderer.invoke('wechat-personal:getVoiceDiagnostic'),
+  getAgentHubStatus: () => ipcRenderer.invoke('agent-hub:getStatus'),
+  getAgentHubLogs: () => ipcRenderer.invoke('agent-hub:getLogs'),
+  clearAgentHubLogs: () => ipcRenderer.invoke('agent-hub:clearLogs'),
+  startAgentHubLogin: () => ipcRenderer.invoke('agent-hub:startLogin'),
+  cancelAgentHubLogin: () => ipcRenderer.invoke('agent-hub:cancelLogin'),
+  reconnectAgentHub: () => ipcRenderer.invoke('agent-hub:reconnect'),
+  disconnectAgentHub: () => ipcRenderer.invoke('agent-hub:disconnect'),
+  selectAgentHubTestImage: () => ipcRenderer.invoke('agent-hub:selectTestImage'),
+  selectSourceSendFile: (kind: 'image' | 'audio' | 'file' | 'sticker' | 'album') =>
+    ipcRenderer.invoke('source:selectSendFile', kind),
+  selectDingtalkSendFile: (kind: 'image' | 'audio') =>
+    ipcRenderer.invoke('source:selectSendFile', kind),
+  getAgentHubConversations: () => ipcRenderer.invoke('agent-hub:getConversations'),
+  getAgentHubConversation: (userId: string) =>
+    ipcRenderer.invoke('agent-hub:getConversation', userId),
+  clearAgentHubConversations: () => ipcRenderer.invoke('agent-hub:clearConversations'),
+  onAgentHubConversation: (
+    callback: (payload: {
+      summary: AgentHubConversationSummary
+      message: AgentHubConversationMessage
+    }) => void
+  ) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: { summary: AgentHubConversationSummary; message: AgentHubConversationMessage }
+    ): void => callback(payload)
+    ipcRenderer.on('agent-hub:conversation', listener)
+    return () => ipcRenderer.removeListener('agent-hub:conversation', listener)
+  },
+  onAgentHubConversationsCleared: (callback: () => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('agent-hub:conversationsCleared', listener)
+    return () => ipcRenderer.removeListener('agent-hub:conversationsCleared', listener)
+  },
+  onAgentHubStatus: (callback: (status: AgentHubStatus) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: AgentHubStatus): void =>
+      callback(status)
+    ipcRenderer.on('agent-hub:status', listener)
+    return () => ipcRenderer.removeListener('agent-hub:status', listener)
+  },
+  onAgentHubLog: (callback: (entry: AgentHubLogEntry) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, entry: AgentHubLogEntry): void =>
+      callback(entry)
+    ipcRenderer.on('agent-hub:log', listener)
+    return () => ipcRenderer.removeListener('agent-hub:log', listener)
+  }
+}
+
+if (process.contextIsolated) {
+  try {
+    contextBridge.exposeInMainWorld('electron', electronAPI)
+    contextBridge.exposeInMainWorld('api', api)
+  } catch (error) {
+    console.error(error)
+  }
+} else {
+  // @ts-ignore (define in dts)
+  window.electron = electronAPI
+  // @ts-ignore (define in dts)
+  window.api = api
+}

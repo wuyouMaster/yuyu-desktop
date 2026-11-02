@@ -1,0 +1,38 @@
+import { managedResourcePath } from './runtime-paths'
+import { app } from 'electron'
+import { existsSync } from 'fs'
+import { dirname, join } from 'path'
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)))
+}
+
+export function getResourceRoots(): string[] {
+  const appPath = app.getAppPath()
+  const appPathDir = dirname(appPath)
+  const execDir = dirname(process.execPath)
+
+  return unique([
+    process.env.YUYU_RESOURCES_PATH || '',
+    join(process.cwd(), 'resources'),
+    join(process.cwd(), 'resources', 'resources'),
+    join(process.resourcesPath || '', 'resources'),
+    process.resourcesPath || '',
+    join(appPath, 'resources'),
+    join(appPathDir, 'resources'),
+    appPathDir,
+    join(execDir, 'resources'),
+    join(dirname(execDir), 'Resources', 'resources'),
+    join(dirname(execDir), 'Resources')
+  ]).filter((root) => existsSync(root))
+}
+
+export function getResourceCandidates(relativePath: string): string[] {
+  const managed = managedResourcePath(relativePath)
+  if (managed) return [managed]
+  return unique(getResourceRoots().map((root) => join(root, relativePath)))
+}
+
+export function findResource(relativePath: string): string | null {
+  return getResourceCandidates(relativePath).find((candidate) => existsSync(candidate)) || null
+}

@@ -1,0 +1,301 @@
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import type { JSX, MouseEvent as ReactMouseEvent } from 'react'
+import type { VoiceMessageReference, VoiceModelStatus } from '../../../shared/voice-recognition'
+import { resolveUnifiedAsset } from '../utils/unified-entity-adapter'
+
+interface VoicePlayerProps {
+  assetId?: string
+  sessionId?: string
+  localId?: number
+  createTime?: number
+  svrId?: string | number
+  duration?: number
+}
+
+let globalCurrentAudio: HTMLAudioElement | null = null
+let globalStopCallback: (() => void) | null = null
+
+export function VoicePlayer({
+  assetId,
+  sessionId,
+  localId,
+  createTime,
+  svrId,
+  duration
+}: VoicePlayerProps): JSX.Element {
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [audioDuration, setAudioDuration] = useState<number | undefined>(duration)
+  const [modelStatus, setModelStatus] = useState<VoiceModelStatus | null>(null)
+  const [transcribing, setTranscribing] = useState(false)
+  const [transcript, setTranscript] = useState<string | null>(null)
+  const [transcriptError, setTranscriptError] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
+  const voiceReference = useMemo<VoiceMessageReference | undefined>(
+    () =>
+      sessionId && localId !== undefined && createTime !== undefined
+        ? { sessionId, localId, createTime, svrId }
+        : undefined,
+    [createTime, localId, sessionId, svrId]
+  )
+
+  const stopCurrentAndPlay = useCallback((audio: HTMLAudioElement) => {
+    if (globalCurrentAudio && globalCurrentAudio !== audio) {
+      globalCurrentAudio.pause()
+      globalCurrentAudio.currentTime = 0
+      globalStopCallback?.()
+    }
+    globalCurrentAudio = audio
+  }, [])
+
+  const playAudio = useCallback(
+    async (audio: HTMLAudioElement): Promise<void> => {
+      stopCurrentAndPlay(audio)
+      try {
+        await audio.play()
+        setError(null)
+        setIsPlaying(true)
+        globalStopCallback = () => {
+          setIsPlaying(false)
+          audio.currentTime = 0
+        }
+      } catch (playError) {
+        if (globalCurrentAudio === audio) {
+          globalCurrentAudio = null
+          globalStopCallback = null
+        }
+        setIsPlaying(false)
+        setError('语音播放失败，请重试')
+        console.warn('[VoicePlayer] play failed:', playError)
+      }
+    },
+    [stopCurrentAndPlay]
+  )
+
+  const createAudio = useCallback(
+    (blobUrl: string): HTMLAudioElement => {
+      const audio = new Audio()
+      audio.preload = 'auto'
+      audio.src = blobUrl
+      // Silk 解码出来的时长比微信的 length 系统性偏短（实测少 20–279ms），
+      // 用它覆盖会把刚补回来的精度又弄丢：有原生时长时一律不覆盖，没有才回退。
+      const useDecodedDuration = (): void => {
+        if (duration !== undefined) return
+        if (Number.isFinite(audio.duration)) setAudioDuration(audio.duration)
+      }
+      audio.onloadedmetadata = useDecodedDuration
+      audio.ontimeupdate = useDecodedDuration
+      audio.onended = () => {
+        setIsPlaying(false)
+        if (globalCurrentAudio === audio) {
+          globalCurrentAudio = null
+          globalStopCallback = null
+        }
+      }
+      audioRef.current = audio
+      objectUrlRef.current = blobUrl.startsWith('blob:') ? blobUrl : null
+      return audio
+    },
+    [duration]
+  )
+
+  const handlePlayPause = useCallback(async () => {
+    if (loading) return
+
+    let audio = audioRef.current
+    if (!audio) {
+      setLoading(true)
+      setError(null)
+      try {
+        const asset = await resolveUnifiedAsset(assetId)
+        if (asset?.state === 'available' && asset.uri) {
+          setAudioUrl(asset.uri)
+          audio = createAudio(asset.uri)
+          await playAudio(audio)
+        } else if (!sessionId || localId === undefined || createTime === undefined) {
+          setError(
+            (asset?.extensions?.wechat as { error?: string } | undefined)?.error || '语音暂不可用'
+          )
+        } else {
+          const result = await window.api.getVoiceData(sessionId, localId, createTime, svrId)
+          if (result.success && result.data) {
+            const byteCharacters = atob(result.data)
+            const byteArray = new Uint8Array(byteCharacters.length)
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteArray[i] = byteCharacters.charCodeAt(i)
+            }
+            const blob = new Blob([byteArray], { type: 'audio/wav' })
+            const blobUrl = URL.createObjectURL(blob)
+            setAudioUrl(blobUrl)
+            audio = createAudio(blobUrl)
+            await playAudio(audio)
+          } else {
+            setError(result.error || '获取语音数据失败')
+          }
+        }
+      } catch (loadError) {
+        console.warn('[VoicePlayer] load failed:', loadError)
+        setError('加载语音失败')
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    if (isPlaying) {
+      audio.pause()
+      setIsPlaying(false)
+      if (globalCurrentAudio === audio) {
+        globalCurrentAudio = null
+        globalStopCallback = null
+      }
+    } else {
+      await playAudio(audio)
+    }
+  }, [assetId, createAudio, createTime, isPlaying, loading, localId, playAudio, sessionId, svrId])
+
+  useEffect(() => {
+    return () => {
+      const audio = audioRef.current
+      if (audio) {
+        audio.pause()
+        audio.removeAttribute('src')
+        audio.load()
+      }
+      if (globalCurrentAudio === audio) {
+        globalCurrentAudio = null
+        globalStopCallback = null
+      }
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+      audioRef.current = null
+    }
+  }, [])
+
+  const handleTranscribe = useCallback(
+    async (event: ReactMouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      if (!voiceReference) {
+        setTranscriptError('统一语音暂不支持转文字')
+        return
+      }
+      setTranscriptError(null)
+      const status = await window.api.getVoiceModelStatus()
+      setModelStatus(status)
+      if (status.state !== 'ready') return
+
+      setTranscribing(true)
+      try {
+        // 用户主动触发：跳过身份级缓存，重新取音频（音频级缓存仍生效）。
+        const result = await window.api.recognizeVoice(voiceReference, { force: true })
+        if (result.success) {
+          setTranscript(result.transcript?.trim() || '未识别出文字')
+          setModelStatus(null)
+        } else if (result.code !== 'CANCELLED') {
+          setTranscriptError(result.error || '语音识别失败')
+        }
+      } catch (recognitionError) {
+        console.warn('[VoicePlayer] recognition failed:', recognitionError)
+        setTranscriptError('语音识别失败，请重试')
+      } finally {
+        setTranscribing(false)
+      }
+    },
+    [voiceReference]
+  )
+
+  const handleCancelRecognition = useCallback(
+    async (event: ReactMouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      if (voiceReference) await window.api.cancelVoiceRecognition(voiceReference)
+    },
+    [voiceReference]
+  )
+
+  const handleOpenVoiceSettings = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    window.dispatchEvent(new Event('wxe:open-voice-recognition-settings'))
+  }, [])
+
+  const handleContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (voiceReference) void window.api.showVoiceSourceContextMenu(voiceReference)
+    },
+    [voiceReference]
+  )
+
+  const formatDuration = (seconds: number | undefined): string => {
+    if (!seconds || !isFinite(seconds)) return '0:00'
+    // 微信的口径是四舍五入到整秒（length=4211ms 显示 4"），所以这里也必须 round 而非 floor。
+    // 先整体取整再拆分钟/秒，59.6 → "1:00" 而不会冒出 "0:60"。
+    const rounded = Math.round(seconds)
+    const mins = Math.floor(rounded / 60)
+    const secs = rounded % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  return (
+    <div className="voice-player">
+      <div
+        className={`voice-message ${loading ? 'voice-loading' : ''} ${error && !audioUrl ? 'voice-error' : ''}`}
+        onClick={handlePlayPause}
+        onContextMenu={handleContextMenu}
+      >
+        <span className={`voice-icon ${isPlaying ? 'playing' : ''}`} aria-hidden="true">
+          <svg viewBox="0 0 20 20" focusable="false">
+            {isPlaying ? (
+              <path d="M6 5h3v10H6zM11 5h3v10h-3z" />
+            ) : (
+              <path d="M7 5.5v9l7-4.5-7-4.5Z" />
+            )}
+          </svg>
+        </span>
+        {loading ? (
+          <span className="voice-loading-text">加载中...</span>
+        ) : error && !audioUrl ? (
+          <span className="voice-error-text">当前语音暂不支持播放</span>
+        ) : (
+          <>
+            <div className="voice-bars" aria-hidden="true">
+              <i></i>
+              <i></i>
+              <i></i>
+            </div>
+            <span className="voice-duration">{formatDuration(audioDuration)}</span>
+          </>
+        )}
+        {transcribing ? (
+          <button className="voice-text-action" type="button" onClick={handleCancelRecognition}>
+            取消识别
+          </button>
+        ) : voiceReference ? (
+          <button className="voice-text-action" type="button" onClick={handleTranscribe}>
+            {transcript ? '重新识别' : '转文字'}
+          </button>
+        ) : null}
+      </div>
+      {modelStatus && modelStatus.state !== 'ready' && (
+        <div className="voice-model-panel" onClick={(event) => event.stopPropagation()}>
+          <span>
+            {modelStatus.state === 'downloading'
+              ? `离线模型正在下载 ${Math.round(modelStatus.progress * 100)}%`
+              : modelStatus.state === 'unsupported'
+                ? '当前系统暂不支持语音转文字'
+                : '请先在设置中准备离线语音模型'}
+          </span>
+          <button type="button" onClick={handleOpenVoiceSettings}>
+            前往设置
+          </button>
+        </div>
+      )}
+      {transcribing && <div className="voice-transcript-status">正在识别...</div>}
+      {transcript && <div className="voice-transcript">{transcript}</div>}
+      {transcriptError && <div className="voice-transcript-error">{transcriptError}</div>}
+    </div>
+  )
+}

@@ -1,0 +1,122 @@
+import type {
+  GroupDailyReport,
+  GroupReportMetadata
+} from './group-report'
+import type { ReportTemplateSelectionId } from './report-templates'
+import type { ReportTemplateRef } from './report-template-package'
+
+export type ReportAssetStatus = 'ready' | 'missing'
+export type GeneratedReportSource = 'manual' | 'scheduled'
+
+export interface GeneratedReportRecord {
+  accountRoot?: string
+  id: string
+  contactId: string
+  contactName: string
+  contactAvatar?: string
+  source?: GeneratedReportSource
+  dateRange: string
+  messageCount: number
+  generatedAt: string
+  reportDate: string
+  htmlPath?: string
+  pngPath?: string
+  jsonPath?: string
+  htmlStatus: ReportAssetStatus
+  pngStatus: ReportAssetStatus
+  generatedImage?: string
+  imageSize?: {
+    width: number
+    height: number
+  }
+  duration?: number
+  /** 文字总结模型；modelName 保留为旧记录兼容字段。 */
+  textModelName?: string
+  /** 图片理解模型。 */
+  imageModelName?: string
+  modelName?: string
+  tokenUsage?: {
+    input?: number
+    output?: number
+    total?: number
+    estimated?: boolean
+  }
+  fileSize?: {
+    html?: number
+    png?: number
+  }
+  generationLogs?: {
+    label: string
+    startedAt: string
+    endedAt: string
+    duration: number
+  }[]
+  /** 新版报告保存结构化快照，模板切换时只重新渲染，不再调用 AI。 */
+  reportSnapshot?: GroupDailyReport
+  reportMetadata?: GroupReportMetadata
+  templateId?: ReportTemplateSelectionId
+}
+
+export interface SaveGeneratedReportRequest {
+  accountRoot?: string
+  contactId: string
+  contactName: string
+  contactAvatar?: string
+  source?: GeneratedReportSource
+  dateRange: string
+  messageCount: number
+  generatedAt: string
+  /** 实际覆盖的本地日期；缺省时由 generatedAt 推导。 */
+  reportDate?: string
+  generatedImage?: string
+  htmlPath?: string
+  pngPath?: string
+  duration?: number
+  textModelName?: string
+  imageModelName?: string
+  modelName?: string
+  tokenUsage?: {
+    input?: number
+    output?: number
+    total?: number
+    estimated?: boolean
+  }
+  generationLogs?: {
+    label: string
+    startedAt: string
+    endedAt: string
+    duration: number
+  }[]
+  reportSnapshot?: GroupDailyReport
+  reportMetadata?: GroupReportMetadata
+  templateId?: ReportTemplateSelectionId
+}
+
+export interface UpdateGeneratedReportTemplateRequest {
+  reportId: string
+  templateId: ReportTemplateSelectionId
+  templateRef?: ReportTemplateRef
+  generatedImage?: string
+  htmlPath?: string
+  pngPath?: string
+}
+
+export interface ReportHistoryResult {
+  success: boolean
+  reports?: GeneratedReportRecord[]
+  error?: string
+}
+
+export interface SaveGeneratedReportResult {
+  success: boolean
+  record?: GeneratedReportRecord
+  error?: string
+}
+
+export type UpdateGeneratedReportTemplateResult = SaveGeneratedReportResult
+
+export interface DeleteGeneratedReportResult {
+  success: boolean
+  deletedId?: string
+  error?: string
+}

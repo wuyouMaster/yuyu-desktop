@@ -1,0 +1,109 @@
+import type { Message } from './types'
+
+export type ExportFormat = 'html' | 'csv' | 'json' | 'markdown'
+export type ExportMessageKind =
+  | 'text'
+  | 'image'
+  | 'video'
+  | 'voice'
+  | 'sticker'
+  | 'file'
+  | 'share'
+  | 'location'
+  | 'system'
+
+export type ExportNameMode = 'groupNickname' | 'remark' | 'wechatNickname'
+export type ExportContactType = 'group' | 'user'
+
+export interface ExportTarget {
+  userMd5: string
+  name: string
+  type: 'user' | 'group'
+  avatarUrl?: string
+  nameMode?: ExportNameMode
+  nameMap?: Record<string, string>
+  avatarUrls?: Record<string, string>
+}
+
+export interface ExportRequest {
+  jobId: string
+  scope?: 'selected' | 'all'
+  allContactTypes?: ExportContactType[]
+  targets: ExportTarget[]
+  format: ExportFormat
+  outputName: string
+  outputDirectory?: string
+  startTime?: number
+  endTime?: number
+  kinds: ExportMessageKind[]
+  includeMedia: boolean
+  includeVoiceTranscripts?: boolean
+  /** 合并本机收藏（favorite.db）只读卡片。 */
+  includeFavorites?: boolean
+  /** 合并朋友圈时间线（sns.db）只读卡片。 */
+  includeSnsTimeline?: boolean
+  /** 合并好友申请（general.db FMessageTable）。 */
+  includeFMessage?: boolean
+  /** 合并表情目录（emoticon.db）。 */
+  includeEmoticon?: boolean
+  preferOriginal?: boolean
+  fallbackThumbnail?: boolean
+  keepMissing?: boolean
+  includeAvatars?: boolean
+  zip?: boolean
+}
+
+export interface ExportJobProgress {
+  jobId: string
+  phase:
+    | 'reading'
+    | 'parsing'
+    | 'media'
+    | 'transcribing'
+    | 'writing'
+    | 'compressing'
+    | 'completed'
+    | 'cancelled'
+    | 'failed'
+  processed: number
+  total?: number
+  percent?: number
+  outputPath?: string
+  error?: string
+  currentTargetIndex?: number
+  currentTargetCount?: number
+  currentTargetName?: string
+  currentTargetType?: ExportContactType
+}
+
+export interface ExportTaskRecord {
+  /** Account connection captured when this task was created. */
+  accountRoot?: string
+  jobId: string
+  scope?: 'selected' | 'all'
+  allContactTypes?: ExportContactType[]
+  targetIds: string[]
+  targetNames: string[]
+  targetLabel: string
+  format: ExportFormat
+  includeVoiceTranscripts?: boolean
+  zip?: boolean
+  status: 'running' | 'completed' | 'cancelled' | 'failed'
+  progress: ExportJobProgress
+  createdAt: number
+}
+
+export interface ExportResult {
+  success: boolean
+  outputPath?: string
+  messageCount?: number
+  error?: string
+}
+export type ExportRendererApi = {
+  startExport: (request: ExportRequest) => Promise<ExportResult>
+  cancelExport: (jobId: string) => Promise<{ success: boolean }>
+  revealExport: (path: string) => Promise<{ success: boolean; error?: string }>
+  onExportProgress: (callback: (progress: ExportJobProgress) => void) => () => void
+}
+
+export type ExportMessage = Message

@@ -76,3 +76,30 @@ export const mediaChunkSchema = z
   .strict()
 export type MediaFindQuery = z.infer<typeof mediaFindQuerySchema>
 export type MediaTransfer = z.infer<typeof mediaTransferSchema>
+
+export const mediaAssetQuerySchema = z
+  .object({
+    kind: z.enum(['file', 'video', 'voice']),
+    name: z.string().max(4096).optional(),
+    hashes: z
+      .array(z.string().regex(/^[a-f0-9]{32}$/i))
+      .max(32)
+      .optional(),
+    created: z.number().int().nonnegative().optional(),
+    byteLength: z.number().int().nonnegative().max(mediaTransferBytes).optional(),
+    duration: z.number().nonnegative().optional(),
+    width: z.number().int().nonnegative().optional(),
+    height: z.number().int().nonnegative().optional(),
+    sessionId: z.string().max(256).optional(),
+    localId: z.number().int().nonnegative().optional(),
+    serverId: z.string().max(32).optional()
+  })
+  .strict()
+export type MediaAssetQuery = z.infer<typeof mediaAssetQuerySchema>
+export const mediaAssetSchema = z
+  .object({
+    path: mediaRelativePathSchema,
+    poster: mediaRelativePathSchema.optional(),
+    codec: z.enum(['silk', 'amr']).optional()
+  })
+  .strict()

@@ -1,0 +1,36 @@
+appId: com.yuyu.app
+productName: 语屿 YUYU
+afterPack: scripts/after-pack.cjs
+directories:
+  buildResources: build
+files:
+  - out/**
+  - node_modules/**
+  - build/icon.png
+extraMetadata:
+  main: out/main/index.js
+asarUnpack:
+  - node_modules/ffmpeg-static/**
+  - node_modules/sherpa-onnx-node/**
+  - node_modules/sherpa-onnx-*/**
+  - node_modules/@napi-rs/system-ocr/**
+  - node_modules/@napi-rs/system-ocr-*/**
+extraResources:
+  - from: resources/skill
+    to: skill
+    filter: ['**/*.md']
+  - from: resources/agent-skills
+    to: resources/agent-skills
+    filter: ['**/*.md']
+  - from: resources
+    to: resources
+    filter: ['*.html']
+mac:
+  icon: build/icon.png
+  target: [dir]
+  notarize: false
+  identity: null
+win:
+  target: [dir]
+npmRebuild: false
+publish: null

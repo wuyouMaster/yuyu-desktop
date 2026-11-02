@@ -68,4 +68,4 @@ export interface ImageMediaPort {
   isThumbnailFile(filePath: string): boolean
 }
 
-export type ImageMediaProviderRegistration = CapabilityProvider<ImageMediaPort>
+export type ImageMediaProviderRegistration = CapabilityProvider<ImageMediaPort> & { dispose?(): Promise<void> | void }

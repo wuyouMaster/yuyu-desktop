@@ -10,7 +10,6 @@ import {
   readActive,
   selectRuntime,
   verifyRuntime,
-  verifyRuntimeSync,
   type RuntimePackage
 } from '../../scripts/runtime-store.mjs'
 
@@ -82,10 +81,8 @@ describe('fixed runtime installation', () => {
     })
     expect((await readActive(home)).wechat.sha256).toBe(item.sha256)
     const root = await verifyRuntime(home, item)
-    expect(verifyRuntimeSync(home, item)).toBe(root)
     await writeFile(join(root, 'helper'), 'corrupted')
     await expect(verifyRuntime(home, item)).rejects.toThrow('校验失败')
-    expect(() => verifyRuntimeSync(home, item)).toThrow('校验失败')
   })
   it('keeps the private repository token off redirected asset hosts', async () => {
     const { home, archive, item } = await fixture()

@@ -1,0 +1,55 @@
+const { existsSync } = require('node:fs')
+const path = require('node:path')
+const asar = require(
+  require.resolve('@electron/asar', { paths: [require.resolve('electron-builder')] })
+)
+module.exports = async function (context) {
+  const resources =
+    context.electronPlatformName === 'darwin'
+      ? path.join(
+          context.appOutDir,
+          context.packager.appInfo.productFilename + '.app',
+          'Contents',
+          'Resources'
+        )
+      : path.join(context.appOutDir, 'resources')
+  if (!existsSync(path.join(resources, 'skill/yuyu-reader/SKILL.md')))
+    throw new Error('Bundled Reader Skill missing')
+  const archive = path.join(resources, 'app.asar'),
+    files = new Set(asar.listPackage(archive))
+  for (const item of [
+    'out/main/index.js',
+    'out/main/runtimeRpcWorker.js',
+    'out/preload/index.js',
+    'build/icon.png'
+  ])
+    if (!files.has('/' + item)) throw new Error('Packaged application file missing: ' + item)
+  const manifest = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'))
+  for (const dependency of Object.keys(manifest.dependencies || {}))
+    if (!files.has('/node_modules/' + dependency + '/package.json'))
+      throw new Error('Production dependency missing: ' + dependency + '; package with pnpm 7.33.7')
+  const prohibited = [...files].filter(
+    (p) =>
+      /^\/(tools|services|docs|\.git|\.env)(\/|$)/.test(p) ||
+      /(wechat-storage-host|telegram-storage-host|xkey_helper|xsend-v3-resident|libwx[^/]*\.dylib)$/.test(
+        p
+      )
+  )
+  if (prohibited.length) throw new Error('Private runtime entered application package')
+  const platform = context.electronPlatformName,
+    arch = context.arch === 3 ? 'arm64' : context.arch === 1 ? 'x64' : undefined
+  if (!arch) throw new Error('Unverified packaging architecture')
+  const unpacked = path.join(resources, 'app.asar.unpacked', 'node_modules')
+  const required = ['ffmpeg-static/' + (platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')]
+  if (platform === 'darwin' || platform === 'win32') {
+    const ocr = platform + '-' + arch + (platform === 'win32' ? '-msvc' : '')
+    required.push('@napi-rs/system-ocr-' + ocr + '/system-ocr.' + ocr + '.node')
+    required.push(
+      'sherpa-onnx-' + (platform === 'win32' ? 'win' : platform) + '-' + arch + '/sherpa-onnx.node'
+    )
+  }
+  for (const file of required)
+    if (!existsSync(path.join(unpacked, file)))
+      throw new Error('Native package dependency missing: ' + file)
+  console.log('Application package verified: dependencies present; independent runtimes excluded')
+}

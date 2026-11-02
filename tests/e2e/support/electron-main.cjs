@@ -1,0 +1,1434 @@
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/explicit-function-return-type */
+const { app, BrowserWindow, ipcMain } = require('electron')
+const fs = require('fs')
+const path = require('path')
+
+const root = path.resolve(__dirname, '../../..')
+const fixture = structuredClone(require(path.join(root, 'tests/fixtures/chat-data.json')))
+let imageKeyConfigured = process.env.YUYU_E2E_MISSING_IMAGE_KEY !== '1'
+const historyMessageCount = Number(process.env.YUYU_E2E_HISTORY_MESSAGES) || 0
+if (historyMessageCount > 0) {
+  const messages = fixture.messages['group-regular-md5']
+  const firstTime = messages[0].createTime
+  messages.unshift(...Array.from({ length: historyMessageCount }, (_, index) => ({
+    id: `fixture-history-${index}`,
+    from: 'user',
+    name: `合成成员${index % 2}`,
+    type: '普通文本',
+    content: `合成历史消息 ${index + 1}`,
+    contentData: { type: 'text', content: `合成历史消息 ${index + 1}` },
+    isSender: false,
+    createTime: firstTime - (historyMessageCount - index) * 60
+  })))
+}
+const userData = process.env.YUYU_E2E_USER_DATA
+if (!userData) throw new Error('YUYU_E2E_USER_DATA is required')
+const backgroundE2E = process.env.YUYU_E2E_HEADLESS === '1'
+app.setPath('userData', userData)
+app.setPath('logs', path.join(userData, 'logs'))
+app.commandLine.appendSwitch('disable-gpu')
+
+const VALID_KEY = 'a'.repeat(64)
+const imageData = `data:image/png;base64,${fs.readFileSync(process.env.YUYU_TEST_ICON || path.join(root, 'build/icon.png')).toString('base64')}`
+const voiceData = 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='
+const configuredNow = Number(process.env.YUYU_E2E_NOW_MS)
+const updateSimulation = process.env.YUYU_E2E_UPDATE_SIMULATION === '1'
+const personalWechatSupported = process.platform === 'darwin' || process.platform === 'win32'
+const unsignedMacUpdate = process.env.YUYU_E2E_UNSIGNED_MAC_UPDATE === '1'
+const fixtureNowMs =
+  Number.isFinite(configuredNow) && configuredNow > 0 ? configuredNow : Date.now()
+let keepOneBotProcess = false
+let lastPersonalWechatSendRequest = null
+
+const formatFixtureDateTime = (timestampSeconds) => {
+  const date = new Date(timestampSeconds * 1000)
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+const allFixtureMessages = Object.values(fixture.messages).flat()
+const latestFixtureTime = Math.max(...allFixtureMessages.map((message) => message.createTime || 0))
+const fixtureTimeOffset = Math.floor(fixtureNowMs / 1000) - 3600 - latestFixtureTime
+for (const message of allFixtureMessages) {
+  message.createTime = (message.createTime || latestFixtureTime) + fixtureTimeOffset
+  message.datetime = formatFixtureDateTime(message.createTime)
+}
+
+const encodeFixtureMessageRef = (conversationId, messageId) =>
+  Buffer.from(JSON.stringify({ c: conversationId, m: messageId })).toString('base64url')
+
+const emptyTimings = () => ({
+  queryUnderstandingMs: 0,
+  contactResolutionMs: 0,
+  knowledgeSearchMs: 0,
+  workerIpcMs: 0,
+  workerBootMs: 0,
+  dispatchMs: 0,
+  workerSqlMs: 0,
+  responseSerializeMs: 0,
+  responseTransferMs: 0,
+  workerQueueMs: 0,
+  workerExecutionMs: 0,
+  globalCountMs: 0,
+  voiceCoverageMs: 0,
+  wcdbQueueMs: 0,
+  wcdbExecutionMs: 0,
+  senderEnrichmentMs: 0,
+  ipcMs: 0,
+  serializationMs: 0,
+  otherMs: 0,
+  ftsMs: 0,
+  chunkExpandMs: 0,
+  messageLoadMs: 0,
+  rankingMs: 0,
+  candidateRankingMs: 0,
+  evidenceBuildMs: 0,
+  aggregationMs: 0,
+  contextPreparationMs: 0,
+  agentDecisionMs: 0,
+  agentToolMs: 0,
+  aiGenerationMs: 0,
+  totalMs: 1
+})
+
+const aiSearchResult = (request) => {
+  const failure = process.env.YUYU_E2E_AI_FAILURE
+  const evidence = [
+    {
+      id: 'E1',
+      chunkId: 'fixture-chunk',
+      conversationId: 'group-regular-md5',
+      conversationName: '产品测试群',
+      conversationType: 'group',
+      startTime: fixture.messages['group-regular-md5'][0].createTime * 1000,
+      endTime: fixture.messages['group-regular-md5'][0].createTime * 1000,
+      messageId: 'msg-text',
+      senderId: 'wxid_fixture_member',
+      sender: '测试成员',
+      timestamp: fixture.messages['group-regular-md5'][0].createTime * 1000,
+      messageIds: ['msg-text'],
+      sourceKind: 'text',
+      text: '这是一条脱敏测试消息',
+      score: 1
+    }
+  ]
+  return {
+    requestId: request.requestId,
+    status: failure ? 'ai_failed' : 'completed',
+    plan: {
+      intent: 'general',
+      keywords: ['测试'],
+      variants: [],
+      source: 'local',
+      scopeLabel: '全局搜索',
+      rangeLabel: '近 30 天',
+      timeRange: {
+        startTime: Math.floor(Date.now() / 1000) - 30 * 86400,
+        endTime: Math.floor(Date.now() / 1000),
+        label: '近 30 天',
+        reason: 'E2E fixture',
+        source: 'ui'
+      },
+      contactNames: []
+    },
+    knowledge: {
+      source: 'knowledge',
+      state: 'ready',
+      indexedMessageCount: allFixtureMessages.length,
+      indexedChunkCount: 1,
+      totalMessages: allFixtureMessages.length,
+      voiceCoverage: {
+        voiceMessageCount: 1,
+        transcribedVoiceCount: 1,
+        failedVoiceCount: 0,
+        voiceCoverageComplete: true
+      }
+    },
+    candidateEvidenceCount: 1,
+    retrieval: {
+      intent: 'general',
+      timeRange: {
+        startTime: Math.floor(Date.now() / 1000) - 30 * 86400,
+        endTime: Math.floor(Date.now() / 1000),
+        label: '近 30 天',
+        reason: 'E2E fixture',
+        source: 'ui'
+      },
+      retrievalMode: 'global_fts',
+      candidateCount: 1,
+      uniqueCandidateCount: 1,
+      sourceMessageCount: allFixtureMessages.length,
+      sourceCoverage: 'complete',
+      isComplete: true,
+      fallbackUsed: false,
+      suspicious: false
+    },
+    evidence,
+    contextEvidenceCount: 1,
+    aggregation: {
+      messageCount: 1,
+      peopleCount: 1,
+      conversationCount: 1,
+      people: [],
+      conversations: []
+    },
+    agent: { mode: 'fallback', toolCalls: 0, trace: [], fallbackReason: 'E2E fixture' },
+    citationValidation: { status: 'valid', invalidCitationIds: [] },
+    timings: emptyTimings(),
+    answer: failure ? undefined : '固定假回答：测试数据中的核心流程正常。',
+    ai: {
+      providerName: '本地假服务',
+      modelName: '固定响应模型',
+      inputTokens: 10,
+      inputTokensEstimated: false
+    },
+    error: failure ? `本地假服务错误 ${failure}` : undefined,
+    errorStage: failure ? 'ai_generating' : undefined,
+    elapsedMs: 1
+  }
+}
+
+const askWechatResult = (request) => {
+  const failure = process.env.YUYU_E2E_AI_FAILURE
+  const conversationId = request?.scope?.scope?.conversationId || 'group-regular-md5'
+  const message = (fixture.messages[conversationId] || []).find((item) => item.id === 'msg-text')
+  const evidenceMessage = message || fixture.messages['group-regular-md5'][0]
+  const scope = request?.scope?.scope || { kind: 'current', conversationId }
+  const scopeLabel = request?.scope?.label || '当前会话：产品测试群'
+  const diagnostics = {
+    entry: 'desktop',
+    provider: '本地假服务',
+    model: '固定响应模型',
+    modelCallCount: 1,
+    toolCallCount: 1,
+    tools: ['query_messages'],
+    totalMs: 1,
+    outcome: failure ? 'provider_unavailable' : 'answered'
+  }
+  if (failure) {
+    return {
+      engine: 'query-agent',
+      status: 'provider_unavailable',
+      message: '本地假服务错误 ' + failure,
+      diagnostics
+    }
+  }
+  return {
+    engine: 'query-agent',
+    status: 'answered',
+    answer: '固定假回答：测试数据中的核心流程正常。\n\n可核对的原始消息见 [E1]。',
+    evidence: [
+      {
+        citationId: 'E1',
+        messageRef: encodeFixtureMessageRef(conversationId, evidenceMessage.id),
+        conversationName: '产品测试群',
+        conversationType: 'group',
+        sender: '测试成员',
+        timestamp: evidenceMessage.createTime * 1000,
+        messageType: 'text',
+        text: '这是一条脱敏测试消息',
+        source: 'query_messages'
+      }
+    ],
+    stats: {
+      tools: ['query_messages'],
+      reads: { messageCount: 1, matchedCount: 0, overviewSourceCount: 0, evidenceCount: 1 },
+      scope: { kind: scope.kind, label: scopeLabel },
+      modelCallCount: 1,
+      toolCallCount: 1,
+      totalMs: 1
+    },
+    diagnostics
+  }
+}
+const reportJson = JSON.stringify({
+  overview: '固定脱敏日报',
+  hero: {
+    headline: '产品测试群日报',
+    summary: '测试消息已完成自动整理。',
+    keyTakeaway: '核心流程可用',
+    pendingNote: '',
+    statusLine: '今日形成 1 个结论'
+  },
+  topics: [
+    {
+      title: '自动化测试',
+      timeRange: '10:00-10:02',
+      heat: '中',
+      participants: ['测试成员'],
+      summary: '讨论了脱敏自动化测试。',
+      conclusions: [{ text: '核心流程可用', sourceMessageIds: ['msg-text'] }],
+      keywords: ['测试'],
+      sourceMessageIds: ['msg-text']
+    }
+  ],
+  resources: [],
+  importantMessages: [],
+  quotes: [],
+  qa: [],
+  todos: [],
+  unresolved: [],
+  storylines: [],
+  reversals: [],
+  participantChains: [],
+  keywords: ['测试']
+})
+
+let connected = process.env.YUYU_E2E_MODE !== 'disconnected'
+let savedKey = connected ? VALID_KEY : ''
+let settings = {
+  dbRoot: 'fixture-account',
+  apiEnabled: false,
+  apiHost: '127.0.0.1',
+  apiPort: 5031,
+  imageKeyRoot: 'fixture-account',
+  ffmpegPath: '',
+  recallProtectionEnabled: false,
+  debugEnabled: false,
+  autoLogin: connected,
+  autoLoginPreferenceSet: true,
+  appearanceTheme: process.env.YUYU_E2E_APPEARANCE_THEME === 'dark' ? 'dark' : 'light',
+  compactMode: false,
+  showStartupProgress: false,
+  imageXorKey: '0x40',
+  imageAesKey: '0123456789abcdef'
+}
+
+const extraContacts = Number(process.env.YUYU_E2E_LARGE_CONTACTS || 0)
+const contacts = [...fixture.contacts]
+for (let index = 0; index < extraContacts; index += 1) {
+  contacts.push({
+    m_nsUsrName: `fixture_${index}`,
+    m_nsNickName: `性能样本 ${index}`,
+    md5: `fixture-contact-${index}`,
+    type: index % 5 === 0 ? 'group' : 'user'
+  })
+}
+
+const handlers = new Map()
+const handle = (channel, fn) => {
+  handlers.set(channel, fn)
+  ipcMain.handle(channel, async (event, ...args) => fn(...args))
+}
+
+const groupExitEvent = {
+  id: 'fixture-exit-event',
+  contactId: 'group-regular-md5',
+  roomId: 'group_regular@chatroom',
+  groupName: '产品测试群',
+  memberWxid: 'wxid_fixture_member',
+  memberName: '测试成员',
+  wechatName: '测试成员微信名',
+  groupRemark: '测试成员群备注',
+  contactRemark: '测试成员通讯录备注',
+  previousCount: 240,
+  currentCount: 239,
+  delta: -1,
+  message: '测试成员退出了产品测试群',
+  detectedAt: fixtureNowMs - 60 * 1000
+}
+let groupExitMonitorState = {
+  enabled: connected,
+  events: [groupExitEvent],
+  running: connected,
+  nativeMonitorActive: connected,
+  monitoredGroupCount: 2,
+  monitorSelectionConfigured: true,
+  monitoredRoomIds: ['group_regular@chatroom', 'group_folded@chatroom'],
+  notificationRoomIds: [],
+  notificationTemplate:
+    '[退群监测]\n\n用户: {user}\n\n群备注: {groupRemark}\n\n微信号: {wxid}\n\n人数: {previousCount} -> {currentCount}\n\n退群时间: {time}',
+  lastCheckedAt: fixtureNowMs - 30 * 1000,
+  lastReadAt: 0,
+  unreadCount: 1
+}
+const cloneGroupExitMonitorState = () => ({
+  ...groupExitMonitorState,
+  events: groupExitMonitorState.events.map((event) => ({ ...event })),
+  unreadCount: groupExitMonitorState.events.filter(
+    (event) => event.detectedAt > groupExitMonitorState.lastReadAt
+  ).length
+})
+handle('group-exit-monitor:getState', () => cloneGroupExitMonitorState())
+handle('group-exit-monitor:setGroups', (roomIds, notificationRoomIds) => {
+  const selected = Array.isArray(roomIds)
+    ? roomIds.filter((roomId) => typeof roomId === 'string' && roomId.endsWith('@chatroom'))
+    : []
+  const notifications = Array.isArray(notificationRoomIds)
+    ? notificationRoomIds.filter(
+        (roomId) => typeof roomId === 'string' && selected.includes(roomId)
+      )
+    : []
+  groupExitMonitorState = {
+    ...groupExitMonitorState,
+    monitorSelectionConfigured: true,
+    monitoredRoomIds: [...new Set(selected)],
+    notificationRoomIds: [...new Set(notifications)],
+    monitoredGroupCount: selected.length,
+    lastCheckedAt: fixtureNowMs
+  }
+  return cloneGroupExitMonitorState()
+})
+handle('group-exit-monitor:setTemplate', (template) => {
+  if (typeof template !== 'string' || !template.trim()) throw new Error('模板不能为空')
+  groupExitMonitorState = {
+    ...groupExitMonitorState,
+    notificationTemplate: template.trim()
+  }
+  return cloneGroupExitMonitorState()
+})
+handle('group-exit-monitor:checkNow', () => {
+  groupExitMonitorState = {
+    ...groupExitMonitorState,
+    lastCheckedAt: fixtureNowMs
+  }
+  return cloneGroupExitMonitorState()
+})
+handle('group-exit-monitor:clearEvents', () => {
+  groupExitMonitorState = {
+    ...groupExitMonitorState,
+    events: [],
+    lastReadAt: fixtureNowMs
+  }
+  return cloneGroupExitMonitorState()
+})
+handle('group-exit-monitor:markRead', (readAt) => {
+  const requestedAt = Number(readAt)
+  groupExitMonitorState = {
+    ...groupExitMonitorState,
+    lastReadAt: Math.max(
+      groupExitMonitorState.lastReadAt,
+      Number.isFinite(requestedAt) && requestedAt > 0 ? requestedAt : fixtureNowMs
+    )
+  }
+  return cloneGroupExitMonitorState()
+})
+
+const scheduledReportTasks = []
+const scheduledReportExecutions = []
+const generatedReports = []
+let scheduledReportNotificationEnabled = false
+const scheduledReportNextRun = (scheduleTime) => {
+  const [hours, minutes] = String(scheduleTime || '09:00')
+    .split(':')
+    .map(Number)
+  const next = new Date(fixtureNowMs)
+  next.setHours(Number.isFinite(hours) ? hours : 9, Number.isFinite(minutes) ? minutes : 0, 0, 0)
+  if (next.getTime() <= fixtureNowMs) next.setDate(next.getDate() + 1)
+  return next.toISOString()
+}
+
+const startupCache = () => ({
+  self: fixture.self,
+  contacts: process.env.YUYU_E2E_SELF_ONLY_BOOTSTRAP_CACHE === '1' ? [] : contacts,
+  updatedAt: Date.now()
+})
+
+handle('runtime-installations:list', () => ['wechat', 'dingtalk', 'telegram'].map(application => ({
+  application, version: '0.1.0-dev.1', target: `${process.platform}-${process.arch}`, status: 'not-installed'
+})))
+handle('runtime-installations:progress', () => null)
+
+handle('settings:get', () => ({ settings, settingsPath: path.join(userData, 'settings.json') }))
+handle('settings:set', (patch) => {
+  settings = { ...settings, ...patch }
+  return { settings, settingsPath: path.join(userData, 'settings.json') }
+})
+handle('tts:getSettings', () => ({
+  success: true,
+  settings: {
+    provider: 'fish-audio',
+    hasApiKey: false,
+    hasStoredApiKey: false,
+    hasEnvironmentApiKey: false,
+    keySource: 'missing',
+    encryptionAvailable: true,
+    selectedVoiceId: '',
+    outputFormat: 'mp3',
+    model: 's2.1-pro-free',
+    phase: 'ready'
+  },
+  voices: []
+}))
+handle('wechat-personal:getRuntimeStatus', () => ({
+  version: 'v0.0.18',
+  state: 'ready',
+  downloadedBytes: 100,
+  totalBytes: 100,
+  progress: 1,
+  platform: 'darwin',
+  architecture: 'arm64',
+  supported: true,
+  removable: true
+}))
+handle('wechat-personal:getStatus', () => ({
+  state: 'online',
+  platform: process.platform,
+  arch: process.arch,
+  sipDisabled: true,
+  wechatRunning: true,
+  wechatPid: 4668,
+  boundWechatPid: 4668,
+  oneBotPid: 5401,
+  endpoint: '127.0.0.1:58080',
+  endpointReady: true,
+  wechatVersion: '4.1.11.53',
+  runtimeReady: true,
+  attachReady: true,
+  baseAddress: '0x114ef8000',
+  baseAddressReady: true,
+  textHookInstalled: true,
+  textHookReady: true,
+  imageHookInstalled: true,
+  imageHookReady: true,
+  messageListenerReady: true,
+  canSend: true,
+  canSendText: true,
+  canSendImage: true,
+  canSendVoice: true,
+  message: '个人微信已绑定'
+}))
+handle('wechat-personal:send', (request) => {
+  lastPersonalWechatSendRequest = structuredClone(request)
+  return {
+    success: true,
+    status: {
+      state: 'online',
+      platform: process.platform,
+      arch: process.arch,
+      sipDisabled: true,
+      wechatRunning: true,
+      runtimeReady: true,
+      endpoint: '127.0.0.1:58080',
+      endpointReady: true,
+      attachReady: true,
+      baseAddressReady: true,
+      textHookInstalled: true,
+      textHookReady: true,
+      imageHookInstalled: true,
+      imageHookReady: true,
+      messageListenerReady: true,
+      canSend: true,
+      canSendText: true,
+      canSendImage: true,
+      canSendVoice: true,
+      message: '个人微信已绑定'
+    }
+  }
+})
+handle('test:getLastPersonalWechatSend', () => lastPersonalWechatSendRequest)
+handle('wechat-personal:getSendCapability', () => ({
+  supported: personalWechatSupported,
+  ready: personalWechatSupported,
+  status: personalWechatSupported ? 'ready' : 'unsupported',
+  capabilities: {
+    text: personalWechatSupported,
+    image: personalWechatSupported,
+    voice: personalWechatSupported
+  },
+  senderStatus: {
+    state: personalWechatSupported ? 'online' : 'unsupported_platform',
+    platform: process.platform,
+    arch: process.arch,
+    sipDisabled: true,
+    wechatRunning: true,
+    boundWechatPid: 4668,
+    endpoint: '127.0.0.1:58080',
+    endpointReady: true,
+    runtimeReady: true,
+    attachReady: true,
+    baseAddressReady: true,
+    textHookInstalled: true,
+    textHookReady: true,
+    imageHookInstalled: true,
+    imageHookReady: true,
+    messageListenerReady: true,
+    canSend: personalWechatSupported,
+    canSendText: personalWechatSupported,
+    canSendImage: personalWechatSupported,
+    canSendVoice: personalWechatSupported,
+    message: '个人微信已绑定'
+  },
+  message: personalWechatSupported
+    ? '个人微信已准备好发送日报'
+    : '微信消息发送目前仅支持 macOS 和 Windows'
+}))
+handle('wechat-personal:getKeepProcess', () => keepOneBotProcess)
+handle('wechat-personal:setKeepProcess', (keep) => {
+  keepOneBotProcess = Boolean(keep)
+  return keepOneBotProcess
+})
+handle('scheduled-report:list', () => [...scheduledReportTasks])
+handle('scheduled-report:listExecutions', (taskId) =>
+  taskId
+    ? scheduledReportExecutions.filter((execution) => execution.taskId === taskId)
+    : [...scheduledReportExecutions]
+)
+handle('scheduled-report:getNotificationSettings', () => ({
+  enabled: scheduledReportNotificationEnabled
+}))
+handle('scheduled-report:setNotificationEnabled', (enabled) => {
+  if (enabled) {
+    return {
+      success: false,
+      data: { enabled: false },
+      reason: 'agent_hub_offline',
+      error: '需要先连接 Agent Hub 微信机器人，才能接收异常通知。'
+    }
+  }
+  scheduledReportNotificationEnabled = false
+  return { success: true, data: { enabled: false } }
+})
+handle('scheduled-report:create', (request) => {
+  const now = new Date(fixtureNowMs).toISOString()
+  const task = {
+    id: `fixture-scheduled-report-${scheduledReportTasks.length + 1}`,
+    name: request.name,
+    group: request.group,
+    scheduleTime: request.scheduleTime,
+    reportRange: request.reportRange || 'yesterday',
+    messageTypes: request.messageTypes,
+    templateId: request.templateId,
+    memberNameMode: request.memberNameMode,
+    timeoutSeconds: request.timeoutSeconds,
+    target: request.target || request.group,
+    enabled: request.enabled !== false,
+    createdAt: now,
+    updatedAt: now,
+    nextRunAt: scheduledReportNextRun(request.scheduleTime)
+  }
+  scheduledReportTasks.push(task)
+  return { success: true, data: task }
+})
+handle('scheduled-report:update', (taskId, request) => {
+  const index = scheduledReportTasks.findIndex((task) => task.id === taskId)
+  if (index < 0) return { success: false, error: '任务不存在' }
+  const current = scheduledReportTasks[index]
+  const next = { ...current, ...request, updatedAt: new Date(fixtureNowMs).toISOString() }
+  if (request.scheduleTime) next.nextRunAt = scheduledReportNextRun(request.scheduleTime)
+  scheduledReportTasks[index] = next
+  return { success: true, data: next }
+})
+handle('scheduled-report:delete', (taskId) => {
+  const index = scheduledReportTasks.findIndex((task) => task.id === taskId)
+  if (index < 0) return { success: false, error: '任务不存在' }
+  scheduledReportTasks.splice(index, 1)
+  return { success: true, data: { deletedId: taskId } }
+})
+handle('scheduled-report:setEnabled', (taskId, enabled) => {
+  const task = scheduledReportTasks.find((item) => item.id === taskId)
+  if (!task) return { success: false, error: '任务不存在' }
+  task.enabled = Boolean(enabled)
+  task.updatedAt = new Date(fixtureNowMs).toISOString()
+  task.nextRunAt = task.enabled ? scheduledReportNextRun(task.scheduleTime) : task.nextRunAt
+  return { success: true, data: task }
+})
+handle('scheduled-report:runNow', (taskId) => {
+  const task = scheduledReportTasks.find((item) => item.id === taskId)
+  if (!task) return { success: false, error: '任务不存在' }
+  const pngPath = path.join(
+    userData,
+    `fixture-scheduled-report-${scheduledReportExecutions.length + 1}.png`
+  )
+  fs.writeFileSync(pngPath, Buffer.from(imageData.split(',')[1], 'base64'))
+  const execution = {
+    id: `fixture-execution-${scheduledReportExecutions.length + 1}`,
+    taskId,
+    triggerType: 'manual',
+    startedAt: new Date(fixtureNowMs).toISOString(),
+    finishedAt: new Date(fixtureNowMs).toISOString(),
+    status: 'success',
+    currentStage: 'send',
+    scheduledSlot: new Date(fixtureNowMs).toISOString().slice(0, 10),
+    retryCount: 0,
+    reportId: `fixture-report-record-${scheduledReportExecutions.length + 1}`,
+    pngPath,
+    sendTarget: task.target,
+    sendStatus: 'success',
+    notificationStatus: 'not_needed',
+    message: '日报生成成功，微信发送成功'
+  }
+  scheduledReportExecutions.push(execution)
+  task.lastRunAt = execution.finishedAt
+  return { success: true, data: execution }
+})
+handle('scheduled-report:retrySend', (executionId) => {
+  const execution = scheduledReportExecutions.find((item) => item.id === executionId)
+  if (!execution) return { success: false, error: '执行记录不存在' }
+  execution.status = 'success'
+  execution.currentStage = 'send'
+  execution.finishedAt = new Date(fixtureNowMs).toISOString()
+  execution.retryCount = Number(execution.retryCount || 0) + 1
+  execution.sendStatus = 'success'
+  execution.message = '日报生成成功，微信发送成功'
+  return { success: true, data: execution }
+})
+handle('scheduled-report:testErrorNotification', (taskId) => {
+  const task = scheduledReportTasks.find((item) => item.id === taskId)
+  if (!task) return { success: false, error: '任务不存在' }
+  const now = new Date(fixtureNowMs).toISOString()
+  const execution = {
+    id: `fixture-debug-execution-${scheduledReportExecutions.length + 1}`,
+    taskId,
+    triggerType: 'scheduled',
+    startedAt: now,
+    finishedAt: now,
+    status: 'failed',
+    currentStage: 'notify',
+    failedStage: 'report',
+    errorCode: 'DEBUG_TEST_NOTIFICATION',
+    technicalMessage: '这是调试用的模拟错误信息；本次没有调用 AI。',
+    userTitle: '定时日报错误通知测试',
+    userMessage: '这是一条调试用的模拟错误通知，用于验证 Agent Hub 推送链路。',
+    suggestedAction: '确认微信中是否收到这条测试通知。',
+    retryable: false,
+    retryCount: 0,
+    sendStatus: 'unavailable',
+    notificationStatus: 'sent'
+  }
+  scheduledReportExecutions.unshift(execution)
+  return { success: true, data: execution }
+})
+handle('wechat-share:getConfig', () => ({
+  success: true,
+  configured: true,
+  serviceUrl: 'https://share.example.test'
+}))
+handle('key:getSavedDbKey', () => ({
+  success: true,
+  key: savedKey || undefined,
+  saved: Boolean(savedKey),
+  encryptionAvailable: true
+}))
+handle('key:saveDbKey', (_accountRoot, key) => {
+  savedKey = String(key || '')
+  return { success: true, key: savedKey, saved: true, encryptionAvailable: true }
+})
+handle('key:clearSavedDbKey', () => {
+  savedKey = ''
+  return { success: true }
+})
+handle('key:getEnvironment', () => ({
+  platform: process.platform,
+  osVersion: process.platform === 'win32' ? 'Windows fixture' : 'macOS fixture',
+  appVersion: 'v2.2.0',
+  wechatVersion: '4.1.9.57',
+  dataStructureVersion: settings.dbRoot === 'fixture-account' ? '微信 4.x（WCDB）' : '未检测到',
+  dataDirectoryDetected: settings.dbRoot === 'fixture-account',
+  diagnosticSummary: 'YUYU: v2.2.0\n数据目录: 已检测到',
+  autoDetectSupported: true,
+  wechatRunning: true,
+  accountIdentified: connected,
+  dbConnected: connected,
+  encryptionAvailable: true
+}))
+handle('key:readClipboardDbKey', () => ({ success: true, value: VALID_KEY }))
+handle('key:pasteAndSaveDbKey', () => ({ success: true, key: VALID_KEY }))
+handle('key:autoGetDbKey', () => ({ success: true, key: VALID_KEY, saved: false }))
+handle('key:autoGetImageKey', () => ({
+  success: true,
+  xorKey: 64,
+  aesKey: '0123456789abcdef',
+  verified: true
+}))
+
+handle('db:init', (key, accountRoot) => {
+  if (settings.dbRoot === 'Z:\\missing-wechat-data') {
+    connected = false
+    return {
+      success: false,
+      code: 'ROOT_UNAVAILABLE',
+      error: '微信数据目录不存在，请重新选择目录',
+      monitoring: false
+    }
+  }
+  if (key !== VALID_KEY) {
+    connected = false
+    return { success: false, error: '数据库密钥无效', monitoring: false }
+  }
+  connected = true
+  settings.dbRoot = accountRoot || settings.dbRoot
+  return { success: true, monitoring: true }
+})
+handle('db:testConnection', (key) =>
+  key === VALID_KEY
+    ? { success: true, wxid: fixture.self.wxid, accountRoot: fixture.self.accountRoot }
+    : { success: false, code: 'DATABASE_OPEN_FAILED', error: '数据库密钥无效' }
+)
+handle('db:disconnect', () => {
+  connected = false
+  return { success: true }
+})
+handle('db:getStartupCache', () =>
+  process.env.YUYU_E2E_CORRUPT_CACHE === '1' ? null : startupCache()
+)
+handle('db:getBootstrapCache', () =>
+  process.env.YUYU_E2E_CORRUPT_CACHE === '1' ? null : startupCache()
+)
+handle('db:getContacts', (filter) => {
+  const query = String(filter || '').toLowerCase()
+  return query
+    ? contacts.filter((contact) => contact.m_nsNickName.toLowerCase().includes(query))
+    : contacts
+})
+handle('db:getContactAvatars', (usernames) =>
+  Object.fromEntries(
+    contacts
+      .filter((contact) => usernames.includes(contact.m_nsUsrName) && contact.avatar)
+      .map((contact) => [contact.m_nsUsrName, contact.avatar])
+  )
+)
+handle('settings:getSelf', () => ({ ready: true, info: fixture.self }))
+handle('db:getCachedMessages', (md5) => fixture.messages[md5] || [])
+handle('db:getCachedMessagePage', (md5) => ({
+  hit: true,
+  messages: fixture.messages[md5] || [],
+  groupSnapshot: null
+}))
+handle('db:getPriorityWatchPage', (request) => {
+  if (request.accountRoot !== fixture.self.accountRoot) throw new Error('fixture account mismatch')
+  const rows = fixture.messages[request.conversationId] || []
+  return {
+    messages: rows.filter((m) => request.senderIds.includes(m.senderId)).slice().reverse(),
+    nextEndTime: null,
+    scanned: rows.length
+  }
+})
+handle('db:getMessages', (md5, startTime, endTime, options) => {
+  let messages = fixture.messages[md5] || []
+  if (startTime) messages = messages.filter((message) => (message.createTime || 0) >= startTime)
+  if (endTime) messages = messages.filter((message) => (message.createTime || 0) <= endTime)
+  if (options && options.limit) messages = messages.slice(-options.limit)
+  return messages
+})
+handle('db:getMessagesAround', (md5, messageId) => {
+  const messages = fixture.messages[md5] || []
+  return {
+    messages,
+    found: messages.some((message) => message.id === messageId),
+    radiusSeconds: 21600,
+    truncated: false
+  }
+})
+handle('test:messageChange', (payload = {}) => {
+  const md5 = String(payload.md5 || '')
+  const message = payload.message
+  if (md5 && message && Array.isArray(fixture.messages[md5])) {
+    fixture.messages[md5].push(message)
+  }
+  const event = payload.event || { db: 'message_0.db', table: 'message', action: 'update' }
+  const json = typeof event === 'string' ? event : JSON.stringify(event)
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send('wcdb-change', { type: 'update', json })
+  }
+  return { success: true }
+})
+handle('db:getGroupSnapshot', (md5) =>
+  md5.startsWith('group-')
+    ? {
+        roomId: md5,
+        memberCount: 1,
+        members: [
+          {
+            wxid: 'wxid_fixture_member',
+            nickname: '测试成员',
+            groupNickname: '测试成员',
+            wechatNickname: '测试成员',
+            remark: '',
+            avatar: ''
+          }
+        ]
+      }
+    : null
+)
+handle('db:getImage', (md5, datName, sessionId, options) =>
+  md5 === 'unsupported'
+    ? { success: false, error: '不支持的 DAT 版本' }
+    : !imageKeyConfigured
+      ? { success: false, error: '未配置图片解密密钥' }
+    : {
+        success: true,
+        data: imageData,
+        isThumb: !options?.force,
+        filePath: path.join(userData, options?.force ? 'original.png' : 'thumbnail.png')
+      }
+)
+handle('db:getVoiceData', () => ({ success: true, data: voiceData }))
+const voiceModelStatus = (state = 'missing') => ({
+  modelId: 'sensevoice-small-int8',
+  version: '2024-07-17',
+  state,
+  downloadedBytes: state === 'ready' ? 239549735 : 0,
+  totalBytes: 239549735,
+  progress: state === 'ready' ? 1 : 0,
+  platform: process.platform,
+  architecture: process.arch,
+  supported: process.platform === 'win32' || process.platform === 'darwin'
+})
+handle('voice:getModelStatus', () => voiceModelStatus())
+handle('voice:downloadModel', () => ({ success: true, status: voiceModelStatus('ready') }))
+handle('voice:cancelModelDownload', () => ({ success: true }))
+handle('voice:removeModel', () => voiceModelStatus())
+handle('voice:openModelDirectory', () => ({ success: true }))
+handle('voice:getBatchProgress', () => ({
+  accountIdentity: 'fixture-account',
+  state: 'idle',
+  total: 0,
+  processed: 0,
+  cached: 0,
+  succeeded: 0,
+  failed: 0,
+  elapsedMs: 0,
+  estimatedRemainingMs: null
+}))
+handle('voice:getBatchConversationSummaries', (request) =>
+  request.conversationIds.map((conversationId, index) => ({
+    conversationId,
+    voiceMessageCount: index + 3
+  }))
+)
+handle('voice:getBatchPreflight', (request) => ({
+  accountIdentity: 'fixture-account',
+  conversationCount: request.conversationIds.length,
+  voiceMessageCount: request.conversationIds.length * 3,
+  cachedCount: 0,
+  pendingCount: request.conversationIds.length * 3,
+  failedCount: 0,
+  estimatedDurationMs: null,
+  modelReady: false
+}))
+handle('voice:recognize', () => ({ success: true, transcript: '固定脱敏转写文本', language: 'zh' }))
+handle('voice:cancelRecognition', () => ({ success: true }))
+handle('db:getSticker', (url) =>
+  String(url || '').includes('403')
+    ? {
+        success: false,
+        error: '表情链接已失效或需要微信授权',
+        failureCode: 'access_denied',
+        httpStatus: 403
+      }
+    : { success: true, data: imageData }
+)
+handle('db:parseMessage', (content, messageType) =>
+  messageType === 1
+    ? { type: 'text', content: String(content) }
+    : { type: 'unknown', raw: String(content), messageType }
+)
+
+handle('ai:getRuntimeConfig', () => ({
+  providerId: 'fixture-provider',
+  providerName: '本地假服务',
+  model: 'fixture-model',
+  modelName: '固定响应模型',
+  configured: true,
+  status: 'connected',
+  timeoutMs: 5000
+}))
+handle('ai:getVisionRuntimeConfig', () => ({
+  providerId: 'fixture-vision-provider',
+  providerName: '本地图片假服务',
+  model: 'fixture-vision-model',
+  modelName: '固定图片识别模型',
+  configured: true,
+  status: 'connected',
+  timeoutMs: 5000,
+  source: 'vision-capability'
+}))
+handle('ai:listProviders', () => ({
+  success: true,
+  providers: [
+    {
+      id: 'fixture-provider',
+      name: '本地假服务',
+      type: 'openai-compatible',
+      baseUrl: 'http://127.0.0.1:1/v1',
+      auth: { type: 'none' },
+      models: [
+        {
+          id: 'fixture-model',
+          name: '固定响应模型',
+          capabilities: { chat: true, vision: false, ocr: false, longContext: true }
+        },
+        {
+          id: 'fixture-vision-model',
+          name: '固定图片识别模型',
+          capabilities: { chat: true, vision: true, ocr: true, longContext: true }
+        }
+      ],
+      defaultModel: 'fixture-model',
+      advanced: { timeoutMs: 5000, extraHeaders: {} },
+      hasApiKey: true,
+      isDefault: true,
+      status: 'connected'
+    }
+  ],
+  defaultProviderId: 'fixture-provider'
+}))
+handle('ai:migrateLegacy', () => ({ success: true, providers: [] }))
+handle('ai:chat', (messages) => {
+  const failure = process.env.YUYU_E2E_AI_FAILURE
+  if (failure) return { success: false, error: `本地假服务错误 ${failure}` }
+  const system = String(messages?.[0]?.content || '')
+  if (system.includes('本地聊天检索规划器')) {
+    return {
+      success: true,
+      data: '{"intent":"general","keywords":["测试"],"variants":[]}'
+    }
+  }
+  if (system.includes('微信群聊日报编辑') || system.includes('JSON 格式修复器')) {
+    return { success: true, data: reportJson, usage: { input: 10, output: 20, total: 30 } }
+  }
+  return { success: true, data: '固定假回答：测试数据中的核心流程正常。' }
+})
+handle('knowledge:getStatus', () => ({
+  accountId: fixture.self.wxid,
+  state: 'ready',
+  indexedMessageCount: allFixtureMessages.length,
+  indexedChunkCount: 1,
+  sourceMessageCount: allFixtureMessages.length,
+  processedMessages: allFixtureMessages.length,
+  totalMessages: allFixtureMessages.length,
+  estimatedRemainingMs: 0,
+  databaseBytes: 1024,
+  walBytes: 0,
+  shmBytes: 0
+}))
+handle('knowledge:startIndex', () => ({ success: true }))
+handle('knowledge:search', () => ({
+  source: 'knowledge',
+  state: 'ready',
+  evidence: [],
+  indexedMessageCount: allFixtureMessages.length,
+  indexedChunkCount: 1,
+  totalMessages: allFixtureMessages.length,
+  timings: {
+    workerIpcMs: 0,
+    workerBootMs: 0,
+    dispatchMs: 0,
+    workerSqlMs: 0,
+    responseTransferMs: 0,
+    responseSerializeMs: 0,
+    ftsMs: 0,
+    messageLoadMs: 0,
+    chunkExpandMs: 0,
+    rankingMs: 0,
+    totalMs: 0
+  }
+}))
+handle('ai-search:getProviderStatus', () => ({ configured: true, requiresConsent: false }))
+handle('ai-search:authorizeExternalProvider', () => ({ success: true }))
+handle('ai-search:run', (request) => aiSearchResult(request))
+handle('ai-search:cancel', () => ({ cancelled: true }))
+handle('ask-wechat:getConfig', () => ({ queryAgentEnabled: true }))
+handle('ask-wechat:query', (request) => askWechatResult(request))
+handle('ask-wechat:forgetConversation', () => undefined)
+handle('agent-runtime:run', (request) => askWechatResult(request))
+handle('agent-runtime:cancel', () => true)
+handle('agent-runtime:forget', () => undefined)
+
+// Renderer-only market flows use a deterministic catalog; real package validation
+// and rendering run through the isolated reportTemplateTest entry instead.
+const fixtureMarketEntry = {
+  id: 'community.github.fixture.neon',
+  version: '1.0.0',
+  interfaceVersion: '1',
+  name: '霓光指挥日报',
+  description: '合成模板市场验收数据',
+  author: 'fixture',
+  platform: 'desktop',
+  tags: ['fixture'],
+  license: 'MIT',
+  minAppVersion: null,
+  download: 'https://fixture.invalid/template.zip',
+  sizeBytes: 1,
+  sha256: 'a'.repeat(64),
+  status: 'published'
+}
+const marketEnabled = process.env.YUYU_E2E_TEMPLATE_MARKET === 'fixture'
+let installedMarketTemplates = []
+handle('report-template:list', () => structuredClone(installedMarketTemplates))
+handle('report-template-market:list', () => ({
+  success: true,
+  catalog: {
+    schemaVersion: '1',
+    status: 'published',
+    templates: marketEnabled ? [fixtureMarketEntry] : []
+  }
+}))
+handle('report-template-market:install', (id, version) => {
+  if (!marketEnabled || id !== fixtureMarketEntry.id || version !== fixtureMarketEntry.version) {
+    return { success: false, error: 'fixture template not found' }
+  }
+  const template = {
+    id,
+    version,
+    interfaceVersion: '1',
+    source: 'installed',
+    name: fixtureMarketEntry.name,
+    author: 'fixture',
+    entryPath: path.join(userData, 'fixture-market-template.html'),
+    capture: { width: 430, maxWidth: 430, maxHeight: 20000 },
+    license: { spdx: 'MIT' }
+  }
+  fs.writeFileSync(template.entryPath, '<!doctype html><h1>{{REPORT_TITLE}}</h1>')
+  installedMarketTemplates = [template]
+  return { success: true, template, catalogEntry: fixtureMarketEntry }
+})
+handle('report-template:uninstall', (id, version) => {
+  installedMarketTemplates = installedMarketTemplates.filter(
+    (item) => item.id !== id || item.version !== version
+  )
+  return { success: true }
+})
+
+handle('report:export', () => {
+  const htmlPath = path.join(userData, 'fixture-report.html')
+  const pngPath = path.join(userData, 'fixture-report.png')
+  fs.writeFileSync(htmlPath, '<!doctype html><h1>固定脱敏日报</h1>', 'utf8')
+  fs.writeFileSync(pngPath, Buffer.from(imageData.split(',')[1], 'base64'))
+  return { success: true, imageDataUrl: imageData, htmlPath, pngPath }
+})
+handle('report:exportSnapshot', () => {
+  const htmlPath = path.join(userData, 'fixture-report-snapshot.html')
+  const pngPath = path.join(userData, 'fixture-report-snapshot.png')
+  fs.writeFileSync(htmlPath, '<!doctype html><h1>固定脱敏模板快照日报</h1>', 'utf8')
+  fs.writeFileSync(pngPath, Buffer.from(imageData.split(',')[1], 'base64'))
+  return { success: true, imageDataUrl: imageData, htmlPath, pngPath }
+})
+handle('report:prepareTemplateSwitch', () => ({
+  success: true,
+  snapshot: {
+    groupName: '固定脱敏群',
+    reportDate: '2026-08-12',
+    values: { REPORT_TITLE: '固定脱敏群日报' }
+  }
+}))
+handle('report:listGenerated', () => ({ success: true, reports: [...generatedReports] }))
+handle('report:saveGenerated', (request) => {
+  const record = {
+    id: 'fixture-report-record',
+    ...request,
+    htmlStatus: request.htmlPath ? 'ready' : 'missing',
+    pngStatus: request.pngPath ? 'ready' : 'missing'
+  }
+  const index = generatedReports.findIndex((report) => report.id === record.id)
+  if (index >= 0) generatedReports[index] = record
+  else generatedReports.unshift(record)
+  return { success: true, record }
+})
+handle('report:updateGeneratedTemplate', (request) => ({
+  success: true,
+  record: { id: request.reportId, templateId: request.templateId }
+}))
+handle('report:deleteGenerated', () => ({ success: true }))
+handle('report:reveal', () => ({ success: true }))
+handle('copy-image', () => ({ success: true }))
+handle('api:copyText', () => ({ success: true }))
+handle('app-log:write', (entry) => {
+  const safe = JSON.stringify(entry)
+    .replace(/\b(?:0x)?[a-f0-9]{64}\b/gi, '***')
+    .replace(/\bsk-[a-z0-9_-]{8,}\b/gi, '***')
+  fs.mkdirSync(path.join(userData, 'logs'), { recursive: true })
+  fs.appendFileSync(path.join(userData, 'logs', 'e2e.log'), `${safe}\n`, 'utf8')
+})
+handle('app-log:getPath', () => path.join(userData, 'logs', 'e2e.log'))
+handle('app-log:reveal', () => undefined)
+const cacheSummary = () => ({
+  items: [
+    {
+      id: 'bootstrap',
+      label: '启动缓存',
+      description: '联系人和会话的本地启动快照',
+      sizeBytes: 4096,
+      fileCount: 2
+    },
+    {
+      id: 'electron',
+      label: '界面缓存',
+      description: 'Electron 页面资源和网络缓存',
+      sizeBytes: 2 * 1024 * 1024,
+      fileCount: 12
+    },
+    {
+      id: 'knowledge',
+      label: '本地知识库索引',
+      description: '问问微信使用的本地检索索引',
+      sizeBytes: 12 * 1024 * 1024,
+      fileCount: 8
+    }
+  ],
+  totalBytes: 14 * 1024 * 1024 + 4096,
+  updatedAt: fixtureNowMs
+})
+handle('cache:getSummary', cacheSummary)
+handle('cache:clear', cacheSummary)
+handle('api:getStatus', () => ({ running: false, host: settings.apiHost, port: settings.apiPort }))
+handle('api:tokenStatus', () => ({
+  success: true,
+  available: true,
+  hasToken: true,
+  maskedToken: '••••••••••••••••'
+}))
+handle('api:revealToken', () => ({
+  available: true,
+  hasToken: true,
+  maskedToken: '••••••••••••••••',
+  token: 'fixture-api-token'
+}))
+handle('api:copyToken', () => ({
+  success: true,
+  available: true,
+  hasToken: true,
+  maskedToken: '••••••••••••••••'
+}))
+handle('api:rotateToken', () => ({
+  success: true,
+  available: true,
+  hasToken: true,
+  maskedToken: '••••••••••••••••'
+}))
+handle('api:copyCurl', () => ({ success: true }))
+handle('api:skillStatus', () => ({
+  available: true,
+  version: 'v1.2',
+  filePath: '/fixture/yuyu-reader/SKILL.md',
+  directoryPath: '/fixture/yuyu-reader',
+  source: 'development',
+  githubUrl: 'https://example.test/yuyu-reader'
+}))
+handle('api:readSkill', () => ({
+  success: true,
+  content:
+    '# YUYU Reader\n\n## 能力\n- 读取本地聊天记录\n- 导出群聊日报\n\n仅在用户授权后访问。'
+}))
+handle('api:start', () => ({ running: true, host: settings.apiHost, port: settings.apiPort }))
+handle('api:stop', () => ({ running: false, host: settings.apiHost, port: settings.apiPort }))
+handle('api:toggle', (enabled) => ({
+  running: enabled,
+  host: settings.apiHost,
+  port: settings.apiPort
+}))
+const agentHubStatus = () => ({
+  hub: 'offline',
+  connector: 'disconnected',
+  updatedAt: fixtureNowMs,
+  dataApi: 'online',
+  databaseReady: true
+})
+handle('agent-hub:getStatus', agentHubStatus)
+handle('agent-hub:getLogs', () => [])
+handle('agent-hub:getConversations', () => [])
+handle('agent-hub:getConversation', () => null)
+handle('agent-hub:clearConversations', () => ({ success: true }))
+handle('agent-hub:clearLogs', () => ({ success: true }))
+handle('agent-hub:startLogin', () => ({ status: agentHubStatus() }))
+handle('agent-hub:cancelLogin', () => ({ status: agentHubStatus() }))
+handle('agent-hub:disconnect', () => ({ status: agentHubStatus() }))
+handle('image:getConfig', () => ({
+  success: true,
+  configured: imageKeyConfigured,
+  saved: imageKeyConfigured,
+  encryptionAvailable: true,
+  source: imageKeyConfigured ? 'secure-storage' : 'none',
+  resourceRoot: settings.imageKeyRoot,
+  xorKey: settings.imageXorKey,
+  aesKey: imageKeyConfigured ? settings.imageAesKey : undefined
+}))
+handle('image:saveConfig', (request) => {
+  imageKeyConfigured = true
+  return {
+    success: true,
+    configured: true,
+    saved: true,
+    encryptionAvailable: true,
+    source: 'secure-storage',
+    ...request
+  }
+})
+handle('image:testConfig', () => ({
+  success: true,
+  fileFound: true,
+  decrypted: true,
+  readable: true,
+  diagnosticLog: 'YUYU 图片解析测试日志（已脱敏）\n测试结果：成功（SUCCESS）'
+}))
+handle('image:clearConfig', () => {
+  imageKeyConfigured = false
+  return { success: true }
+})
+handle('image:getDecoderStatus', () => ({
+  installed: true,
+  available: true,
+  source: 'system',
+  selected: false
+}))
+handle('image:getStatus', () => ({
+  configured: imageKeyConfigured,
+  saved: imageKeyConfigured,
+  encryptionAvailable: true,
+  source: imageKeyConfigured ? 'secure-storage' : 'none',
+  resourceRoot: settings.imageKeyRoot,
+  platform: process.platform,
+  autoDetectSupported: true,
+  wechatRunning: true,
+  accountIdentified: true,
+  cacheState: 'normal',
+  decoder: { installed: true, available: true, source: 'system', selected: false },
+  resources: Object.fromEntries(
+    ['imageIndex', 'imageDirectory', 'thumbnail', 'original', 'sticker', 'video'].map((name) => [
+      name,
+      { state: 'available', detail: 'fixture' }
+    ])
+  )
+}))
+handle('settings:selectDbRoot', () => ({ canceled: false, path: 'fixture-account' }))
+handle('accounts:discover', (inputPath) =>
+  inputPath === 'Z:\\missing-wechat-data'
+    ? { success: false, accounts: [], error: '微信数据目录不存在，请重新选择目录' }
+    : {
+        success: true,
+        inputKind: 'account',
+        preselectedAccountId: 'fixture-account-id',
+        accounts: [
+          {
+            id: 'fixture-account-id',
+            accountRoot: inputPath || 'fixture-account',
+            directoryName: 'fixture-account',
+            wxid: fixture.self.wxid,
+            nickname: fixture.self.nickname,
+            avatar: fixture.self.avatar,
+            hasSavedDbKey: Boolean(savedKey),
+            loginStatus: connected ? 'current' : 'unknown',
+            selectedByInput: true
+          }
+        ]
+      }
+)
+let appUpdateState = updateSimulation
+  ? {
+      status: 'available',
+      currentVersion: '1.9.0',
+      delivery: 'automatic',
+      version: '2.0.0',
+      source: 'startup',
+      isSimulation: true
+    }
+  : unsignedMacUpdate
+    ? {
+        status: 'available',
+        currentVersion: '2.2.2',
+        delivery: 'release-page',
+        version: '2.2.3',
+        source: 'startup'
+      }
+    : { status: 'idle', currentVersion: '2.2.0', delivery: 'automatic' }
+let openedUpdateDownloadUrl = ''
+handle('app-update:getState', () => appUpdateState)
+handle('app-update:openDownloadPage', () => {
+  openedUpdateDownloadUrl = 'https://github.com/wuyouMaster/yuyu-desktop/releases/latest'
+  return { success: true }
+})
+handle('app-update:getOpenedDownloadUrl', () => openedUpdateDownloadUrl)
+handle('app-update:download', async () => {
+  if (!updateSimulation) return { success: true, state: appUpdateState }
+  const total = 60 * 1024 * 1024
+  const steps = [0, 5, 12, 21, 33, 46, 58, 69, 78, 86, 93, 97, 100]
+  let previousTransferred = 0
+  appUpdateState = {
+    ...appUpdateState,
+    status: 'downloading',
+    percent: 0,
+    transferred: 0,
+    total,
+    bytesPerSecond: 0
+  }
+  for (const percent of steps.slice(1)) {
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    const transferred = Math.round((total * percent) / 100)
+    const bytesPerSecond = Math.round((transferred - previousTransferred) / 0.15)
+    previousTransferred = transferred
+    appUpdateState = {
+      ...appUpdateState,
+      status: 'downloading',
+      percent,
+      transferred,
+      total,
+      bytesPerSecond
+    }
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send('app-update:state', appUpdateState)
+    }
+  }
+  appUpdateState = {
+    ...appUpdateState,
+    status: 'downloaded',
+    percent: 100,
+    transferred: total,
+    total,
+    bytesPerSecond: undefined
+  }
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send('app-update:state', appUpdateState)
+  }
+  return { success: true, state: appUpdateState }
+})
+handle('app-update:install', async () =>
+  updateSimulation
+    ? {
+        success: true,
+        simulated: true,
+        message: '开发模拟模式：更新安装动作已模拟，未实际退出应用。'
+      }
+    : { success: true }
+)
+
+for (const channel of [
+  'export:start',
+  'export:cancel',
+  'export:reveal',
+  'settings:openAccountRoot',
+  'db:reopenWithRoot',
+  'api:skillStatus',
+  'api:readSkill',
+  'api:revealSkill',
+  'api:openSkillGithub',
+  'api:testLocalRequest',
+  'image:selectDecoder',
+  'image:openDecoderDownload',
+  'app-update:check',
+  'agent-hub:clearLogs',
+  'agent-hub:startLogin',
+  'agent-hub:cancelLogin',
+  'agent-hub:reconnect',
+  'agent-hub:disconnect',
+  'agent-hub:selectTestImage',
+  'image:listCandidates',
+  'image:analyze',
+  'image:getInsight',
+  'image:listInsights',
+  'db:search',
+  'db:getVideo'
+]) {
+  if (!handlers.has(channel))
+    handle(channel, () => ({ success: true, candidates: [], insights: [] }))
+}
+
+app.whenReady().then(() => {
+  const window = new BrowserWindow({
+    // Keep the E2E window aligned with createWindow() in src/main/index.ts.
+    width: 1400,
+    height: 800,
+    show: false,
+    backgroundColor: '#ffffff',
+    webPreferences: {
+      preload: path.join(root, 'out/preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  })
+  if (!backgroundE2E) window.once('ready-to-show', () => window.show())
+  window.loadFile(path.join(root, 'out/renderer/index.html'))
+})
+
+app.on('window-all-closed', () => app.quit())

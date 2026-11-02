@@ -69,13 +69,16 @@ describe('audio protocol port', () => {
       codec: 'silk',
       sourceHash: 'logical-source-id'
     })
-    expect(actual).toEqual({
-      pcm: h.output,
+    const { pcm, ...metadata } = actual
+    // Buffer.equals compares every byte and length without generic property traversal.
+    expect(Buffer.isBuffer(pcm)).toBe(true)
+    expect(pcm.equals(h.output)).toBe(true)
+    expect(metadata).toEqual({
       sampleRate: 16000,
       channels: 1,
       sourceHash: 'logical-source-id'
     })
-    expect(Buffer.concat(h.uploaded)).toEqual(input)
+    expect(Buffer.concat(h.uploaded).equals(input)).toBe(true)
     expect(h.uploaded.map((b) => b.length)).toEqual([512 * 1024, 188 * 1024])
     expect(h.rpc.callAsync.mock.calls.at(-1)?.[0]).toBe('audio.close')
   })

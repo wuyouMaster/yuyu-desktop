@@ -1,0 +1,28 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="brand-ribbon" x1="47" y1="89" x2="216" y2="176" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9B43" />
+      <stop offset="0.34" stop-color="#FF3D55" />
+      <stop offset="0.64" stop-color="#F21AB5" />
+      <stop offset="1" stop-color="#5B20F5" />
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="54" fill="white" />
+  <rect x="8.5" y="8.5" width="239" height="239" rx="53.5" stroke="#F1F1F5" />
+  <g>
+    <path
+      d="M62 177V111C62 78 88 61 113 70C127 75 136 87 141 101"
+      stroke="url(#brand-ribbon)"
+      stroke-width="39"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M128 177V111C128 78 154 61 179 70C193 75 202 87 207 101V177"
+      stroke="url(#brand-ribbon)"
+      stroke-width="39"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>

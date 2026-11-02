@@ -1,72 +1,76 @@
-# YUYU Desktop — 公开主应用迁移基础
+# YUYU Desktop
 
-这是全新 Git 历史的本地准备仓库，只包含逐文件审查的应用接口、运行时管理和协议消费者。
-**完整 Electron/React 应用仍在迁移，当前不能作为完整桌面产品启动。**
-私有数据库、媒体格式、密码学、密钥捕获及网络协议实现位于独立 Go/C runtime。
+Electron / React 应用层、主进程服务和运行时协议消费者。数据库、私有媒体格式、密钥捕获、
+语音编解码、iLink 网络协议和旧发送组件兼容处理由独立 Go/C runtime 实现。
+此仓库不包含私有源码、二进制、研究文档、日志、用户数据或原私库 Git 历史。
 
-## 当前能力
+## 本地开发
 
-- 固定版本匿名下载、摘要验证、安全解包、原子激活及重新验证。
-- stdio RPC、同步/异步桥接、取消、账号所有权和关闭失败传播。
-- 微信身份/消息消费者；完整 DatabasePort、分页、语音读取和数据库提交观察。
-- 账号媒体定位、分块传输和完整摘要校验；ImageMediaPort 的变体选择、诊断和持久缓存。
-- 密钥验证/捕获和 iLink 会话消费者；文本及指定本地媒体发送，未知结果不自动重试。
-- 安装后先验完整包，再组合账号数据库/图片端口；关闭和重开共享资源生命周期。
-- Telegram 账号/缓存消费者；合成测试与公开文件导出检查。
-
-这里的能力需要匹配的**未发布本地候选**。默认公开下载目录仍为 v0.1.0-dev.2，
-尚不包含新增 Go host；不能把协议实现当成该版本已经具备的功能。新图片解码器已装入本地 dev.8 候选归档，但还未发布。缓存每次命中核对来源及实际载荷，受限目录内持久化，不包含格式解密。
-
-## 本地检查
-
-Node 22、pnpm 7.33.7。Python 3 仅用于测试生成合成 ZIP，不是产品运行依赖。
+Node 22、pnpm 7.33.7；先安装锁定依赖和 Playwright Chromium：
 
 ```sh
-corepack pnpm install --frozen-lockfile --ignore-scripts
-corepack pnpm typecheck
-corepack pnpm test
-corepack pnpm runtime:list
-corepack pnpm runtime:install --application telegram --version 0.1.0-dev.2
-corepack pnpm runtime:verify
+corepack pnpm install --frozen-lockfile
+corepack pnpm exec playwright install chromium
+corepack pnpm dev
 ```
 
-下载文件写入忽略的 `.runtime/`。macOS arm64 候选已完成合成原生进程测试；Windows
-x64/ARM64 仅交叉编译，实机测试待安排。没有真实账号登录、注入或发送验收。
+应用可在没有 runtime、没有账号时独立启动。初始引导允许直接进入主界面；数据源附近和
+设置中均可管理运行时。下载有真实字节进度、取消与重试，校验完成后须重启再配置数据源。
+`build/icon.png` 从受审查 SVG 生成，构建产物、测试截图和下载文件均被 Git 忽略。
 
-## 剩余迁移和发布边界
+**当前默认公开目录仍是 `0.1.0-dev.2`，不包含新增 Go host。** 新数据库、密钥、语音和
+完整 iLink 需要另行批准发布的匹配候选，不能把旧版本安装成功当作新增能力已可用。
+开发验收可由主进程用 `YUYU_RUNTIME_TEST_CATALOG` 指定绝对路径的固定摘要目录，
+打包应用不接受该覆盖；Renderer 不能提供目录、命令或 host 路径。正式地址只能在新产物
+发布并核对匿名下载后更新。新包未发布前，本版本是本地迁移候选。
 
-数据库密钥授权适配、语音编解码和 iLink 账号/登录/轮询/回复上下文/远程媒体/typing
-协议编排已具备离线验证；尚需完成产品 provider 与完整 Electron 主进程、preload、Renderer
-集成、独立启动和业务回归。完整源码清单及许可证/署名
-审查尚未完成；当前不授予新许可。不用空数据、降级实现或跳过测试代替缺失能力。
+## 接口边界
 
-仓库不包含原私库历史、二进制、私有实现、研究材料、日志或凭据。
-[公开目标仓库](https://github.com/wuyouMaster/yuyu-desktop) 已创建但源码尚未推送；
-没有启用 Actions 或发布。本地提交不等于公开交付。
+- 安装器校验归档与 manifest 摘要、应用、平台、文件清单和每个文件；不继承 GitHub 凭据。
+- 主进程创建受控 stdio worker，支持同步/异步 RPC、取消、超时、关闭和错误传播。
+- 数据库接口包含分页、身份/联系人、消息、语音内容、媒体索引及提交观察。
+- 媒体定位与解密在 runtime；应用只处理 DTO、内容摘要、分块传输和展示缓存。
+- 数据库密钥获取需显式授权，先验证所选数据库再保存。没有后台自动提权或捕获。
+- iLink 包含账号/登录、持续轮询、接收确认、会话回复上下文、媒体和输入状态租约；
+  结果不明确的发送不会自动重试。旧发送组件仍属独立显式启动能力。
+- 系统 OCR、语音识别和 Electron 等第三方依赖由包管理器安装，不把它们的二进制提交进 Git。
 
+## 验证与打包
 
-独立候选验收可在本仓库构建 worker（不读取私有仓库源码）：
+```sh
+corepack pnpm typecheck
+corepack pnpm test:unit
+corepack pnpm test:component
+corepack pnpm test:skill-install
+node --test tests/tooling/public-app-export.test.mjs
+corepack pnpm test:e2e:build
+corepack pnpm exec playwright test
+corepack pnpm build:unpack
+```
+
+视觉基线为原私仓已审核的外部输入，不随公开源码分发；设置 `YUYU_VISUAL_BASELINE_ROOT`
+到包含平台子目录的基线根目录，`YUYU_TEST_ICON` 指向原合成截图输入图标。缺失基线会失败，
+不会自动创建或更新。当前原基线还反映早于多数据源/运行时入口改造的界面；差异必须单独
+核对，不能以更新基线或放宽断言处理。Windows 专用手动目录用例在 macOS 的既有平台跳过
+保持原状，不用它证明 Windows 已通过。
+
+真实原生合成测试需明确提供候选与 fixtures，缺失时失败：
 
 ```sh
 corepack pnpm build:runtime-worker
-# 显式提供本地候选 ZIP、扩展合成数据库目录及合成 HEVC 文件的绝对路径：
 # YUYU_TEST_WECHAT_ARCHIVE / YUYU_TEST_DATABASE_DETAILS_ROOT / YUYU_TEST_HEVC_FIXTURE
+# YUYU_TEST_WECHAT_AUDIO_HOST / YUYU_TEST_WECHAT_HOST / YUYU_TEST_WECHAT_CDN_HOST
 corepack pnpm test:runtime:protocol
+node scripts/smoke-install-flow.mjs <absolute-candidate.zip> <absolute-synthetic-account>
 ```
 
-输入缺失会失败，不会跳过；候选包、合成媒体及编译输出都不进入本仓库。测试通过匿名
-回环 HTTP 安装包，再读取合成数据库、解码、关闭重开和验证缓存，另验证产物改写拒绝。
-这是应用协议组合验收，完整 Electron 界面和真实账号验收尚未完成。
+`smoke-install-flow` 使用隔离配置、回环 HTTP、真实安装器及 Electron preload，验证未安装、
+匿名下载、重启、合成数据库连接与联系人。它不证明公网发布、真实账号或 Windows 行为。
+macOS arm64 已进行本地验证；Windows 仅交叉编译，实测待安排。目录打包不是签名/公证发布。
+没有自动推送、发布或 Actions。
 
+## 来源与交付
 
-图片密钥自动检查另有未打包的 dev.9 候选：只处理所选账号和支持的元数据目录，
-仅在完整样本校验且 runtime 正常关闭后报告成功。该适配器只声明 autoGetImageKey；
-不代表数据库进程捕获、提权或 Intel 安装已经完成，也不属于 dev.8 安装包能力。
-
-
-新增安装包同步校验与受控 host 工厂：仅运行应用固定目录内且完整校验成功的 host，
-清理继承环境，并保留授权操作所需的关闭宽限。`WechatCDNClient` 使用 512 KiB 分块
-传输 64 MiB 以内消息媒体，核对输入/输出 SHA-256，不在应用内实现解密。
-真实候选 host 的合成 9 MiB CDN 测试需显式提供 `YUYU_TEST_WECHAT_HOST`，先构建 worker，
-再运行 `pnpm test:runtime:protocol tests/runtime-protocol/wechat-cdn.test.ts`。
-输入缺失或密文损坏均失败；不代表真实账号、Windows 实机或公共发布验收。
+应用沿用原项目的作者标识和第三方依赖署名，见 [NOTICE](NOTICE.md)。当前不新增许可证授权。
+推送和发布须单独确认源仓库、分支、全部提交、目标 remote 的实际 URL 与目标分支。
+[公开目标仓库](https://github.com/wuyouMaster/yuyu-desktop) 与私有 runtime 仓库分离。

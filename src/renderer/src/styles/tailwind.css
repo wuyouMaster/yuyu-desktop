@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --yuyu-background: 220 33% 98%;
+    --yuyu-canvas: 220 25% 97%;
+    --yuyu-foreground: 222 47% 11%;
+    --yuyu-surface: 0 0% 100%;
+    --yuyu-surface-muted: 220 20% 94%;
+    --yuyu-surface-elevated: 0 0% 100%;
+    --yuyu-border: 220 18% 88%;
+    --yuyu-border-subtle: 220 15% 92%;
+    --yuyu-primary: 221 100% 62%;
+    --yuyu-primary-hover: 221 83% 55%;
+    --yuyu-primary-foreground: 0 0% 100%;
+    --yuyu-secondary: 220 20% 94%;
+    --yuyu-secondary-foreground: 222 47% 11%;
+    --yuyu-muted: 220 15% 92%;
+    --yuyu-muted-foreground: 220 12% 46%;
+    --yuyu-subtle-foreground: 220 9% 62%;
+    --yuyu-accent: 221 100% 95%;
+    --yuyu-accent-foreground: 221 100% 62%;
+    --yuyu-ai: 236.8966 62.3656% 63.5294%;
+    --yuyu-ai-soft: 236 78.9474% 96.2745%;
+    --yuyu-success: 157.4194 50.2703% 36.2745%;
+    --yuyu-warning: 33.5172 57.7689% 49.2157%;
+    --yuyu-destructive: 0 50% 56.8627%;
+    --yuyu-destructive-foreground: 0 0% 100%;
+    --yuyu-focus-ring: 221 100% 62%;
+    --yuyu-disabled-surface: 220 20% 94%;
+    --yuyu-disabled-foreground: 220 9% 62%;
+    --yuyu-disabled-border: 220 15% 92%;
+    --yuyu-radius-sm: 0.375rem;
+    --yuyu-radius-md: 0.5rem;
+    --yuyu-radius-lg: 0.75rem;
+    --yuyu-radius-xl: 1rem;
+    --yuyu-shadow-surface: 0 1px 2px rgb(15 23 42 / 0.04);
+    --yuyu-shadow-floating: 0 8px 24px rgb(15 23 42 / 0.1);
+    --yuyu-shadow-popover: 0 12px 32px rgb(15 23 42 / 0.14);
+    --yuyu-shadow-dialog: 0 24px 80px rgb(15 23 42 / 0.2);
+    --yuyu-motion-fast: 120ms;
+    --yuyu-motion-normal: 180ms;
+    --yuyu-motion-slow: 260ms;
+    --yuyu-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --yuyu-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+    --yuyu-control-height-compact: 1.75rem;
+    --yuyu-control-height-standard: 2rem;
+    --yuyu-control-height-form: 2.25rem;
+    --yuyu-z-base: 0;
+    --yuyu-z-dropdown: 40;
+    --yuyu-z-popover: 50;
+    --yuyu-z-toast: 70;
+    --yuyu-z-modal: 60;
+  }
+
+  [data-theme='dark'] {
+    --yuyu-background: 225 29% 5%;
+    --yuyu-canvas: 225 21% 6%;
+    --yuyu-foreground: 220 14% 96%;
+    --yuyu-surface: 221 22% 10%;
+    --yuyu-surface-muted: 222 21% 9%;
+    --yuyu-surface-elevated: 220 21% 11%;
+    --yuyu-border: 0 0% 100% / 0.08;
+    --yuyu-border-subtle: 0 0% 100% / 0.06;
+    --yuyu-primary: 217 91% 60%;
+    --yuyu-primary-hover: 213 97% 68%;
+    --yuyu-primary-foreground: 0 0% 100%;
+    --yuyu-secondary: 220 21% 11%;
+    --yuyu-secondary-foreground: 220 14% 96%;
+    --yuyu-muted: 220 21% 11%;
+    --yuyu-muted-foreground: 218 11% 65%;
+    --yuyu-subtle-foreground: 220 9% 46%;
+    --yuyu-accent: 217 91% 60% / 0.15;
+    --yuyu-accent-foreground: 217 91% 60%;
+    --yuyu-ai: 199 89% 60%;
+    --yuyu-ai-soft: 199 89% 60% / 0.14;
+    --yuyu-success: 160 67% 54%;
+    --yuyu-warning: 43 96% 56%;
+    --yuyu-destructive: 0 89% 70%;
+    --yuyu-destructive-foreground: 0 0% 100%;
+    --yuyu-focus-ring: 199 89% 60%;
+    --yuyu-disabled-surface: 0 0% 100% / 0.04;
+    --yuyu-disabled-foreground: 220 9% 46%;
+    --yuyu-disabled-border: 0 0% 100% / 0.06;
+    --yuyu-shadow-surface: 0 1px 2px rgb(0 0 0 / 0.2);
+    --yuyu-shadow-floating: 0 8px 24px rgb(0 0 0 / 0.28);
+    --yuyu-shadow-popover: 0 12px 32px rgb(0 0 0 / 0.38);
+    --yuyu-shadow-dialog: 0 24px 80px rgb(0 0 0 / 0.48);
+  }
+
+
+  :where(
+    button,
+    input,
+    textarea,
+    select,
+    [role='button'],
+    [role='checkbox'],
+    [role='radio'],
+    [role='switch'],
+    [role='tab']
+  ):focus-visible {
+    outline: 2px solid hsl(var(--yuyu-focus-ring) / 0.75);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}

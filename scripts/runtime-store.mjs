@@ -79,8 +79,7 @@ export function verifyRuntimeSync(home, item) {
     assert(stat.isFile() && !stat.isSymbolicLink(), '运行时文件类型异常')
     const bytes = readFileSync(p)
     assert(bytes.length === file.size && hash(bytes) === file.sha256, '运行时文件校验失败')
-    if (process.platform !== 'win32')
-      assert((stat.mode & 0o777) === file.mode, '运行时文件权限校验失败')
+    if (process.platform !== 'win32') assert((stat.mode & 0o777) === file.mode, '运行时文件权限校验失败')
   }
   return root
 }

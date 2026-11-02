@@ -21,7 +21,7 @@ const dto = (value: unknown): RuntimeJson => JSON.parse(JSON.stringify(value)) a
 export class TelegramStorageClient {
   private ready?: Promise<void>
   private methods = new Set<string>()
-  constructor(private readonly rpc: RuntimeRpcClient) {}
+  constructor(private readonly rpc: Pick<RuntimeRpcClient, 'call' | 'close'>) {}
   private handshake(): Promise<void> {
     this.ready ??= this.rpc.call('runtime.describe', {}).then((value) => {
       const parsed = telegramStorageDescriptionSchema.safeParse(value)
@@ -59,7 +59,7 @@ export class TelegramCacheSession {
   private disposed = false
   private closing?: Promise<void>
   constructor(
-    private readonly rpc: RuntimeRpcClient,
+    private readonly rpc: Pick<RuntimeRpcClient, 'call' | 'close'>,
     private readonly session: string
   ) {}
   async resolve(

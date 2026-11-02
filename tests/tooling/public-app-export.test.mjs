@@ -75,3 +75,14 @@ test('rejects native ABI imports, binary disguise, unsafe names and symlinks', a
   manifest.files[0].path = '../escape.ts'
   await assert.rejects(auditPublicExport(source, manifest), /Forbidden/)
 })
+
+test('rejects embedded native patches and private ciphertext implementations', async (t) => {
+  for (const value of [
+    'Memory.alloc(32)',
+    'new NativeFunction(address)',
+    'createDecipheriv(key)'
+  ]) {
+    const { source, manifest } = await fixture(t, { 'src/private.ts': value })
+    await assert.rejects(auditPublicExport(source, manifest), /Private implementation/)
+  }
+})
