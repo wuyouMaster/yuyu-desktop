@@ -51,10 +51,13 @@ try {
   const skillRead = await page.evaluate(() => window.api.readReaderSkill())
   expect(skillRead.success).toBe(true)
   expect(skillRead.content).toContain('# YUYU Reader')
+  const update = await page.evaluate(() => window.api.checkAppUpdate())
+  expect(update).toMatchObject({ success: false, state: { status: 'unsupported' } })
   const runtime = await page.evaluate(() => window.api.listRuntimeInstallations())
   expect(runtime.some((r) => r.status === 'installed')).toBe(false)
   expect(runtime.find((r) => r.application === 'wechat')).toMatchObject({
-    version: '0.1.0-dev.13', status: 'not-installed'
+    version: '0.1.0-dev.13',
+    status: 'not-installed'
   })
   console.log(
     JSON.stringify({

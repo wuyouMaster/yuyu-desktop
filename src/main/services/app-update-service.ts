@@ -50,7 +50,9 @@ export class AppUpdateService {
   constructor(options: AppUpdateServiceOptions = {}) {
     this.currentVersion = options.currentVersion || (() => app.getVersion())
     this.packagedRuntime = options.packagedRuntime || isPackagedRuntime
-    this.updateSourceAvailable = options.updateSourceAvailable || (() => existsSync(join(process.resourcesPath, 'app-update.yml')))
+    this.updateSourceAvailable =
+      options.updateSourceAvailable ||
+      (() => existsSync(join(process.resourcesPath, 'app-update.yml')))
     this.simulationEnabled =
       options.simulationEnabled ??
       (!app.isPackaged && process.env['YUYU_UPDATE_SIMULATION'] === 'true')
@@ -190,9 +192,13 @@ export class AppUpdateService {
       return { success: false, state }
     }
     if (!this.updateSourceAvailable()) {
-      const state = this.setState({status:'unsupported', source,
-        message:'当前构建尚未配置正式更新源', error:undefined})
-      return {success:false,state}
+      const state = this.setState({
+        status: 'unsupported',
+        source,
+        message: '当前构建尚未配置正式更新源',
+        error: undefined
+      })
+      return { success: false, state }
     }
     try {
       await autoUpdater.checkForUpdates()
@@ -217,6 +223,10 @@ export class AppUpdateService {
 
   private async runDownload(): Promise<AppUpdateCheckResult> {
     if (this.simulationEnabled) return this.simulateDownload()
+    if (!this.updateSourceAvailable()) {
+      const state = this.setState({ status: 'unsupported', message: '当前构建尚未配置正式更新源' })
+      return { success: false, state }
+    }
 
     if (this.delivery === 'release-page') {
       const state = this.setState({

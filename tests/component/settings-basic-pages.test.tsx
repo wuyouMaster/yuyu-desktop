@@ -40,6 +40,9 @@ describe('basic settings pages', () => {
     render(<AboutPage onNotice={vi.fn()} />)
 
     await screen.findByText('v2.2.2')
+    expect(screen.getByRole('link', { name: '查看历史版本与更新说明' })).toHaveAttribute(
+      'href', 'https://github.com/wuyouMaster/yuyu-desktop/releases'
+    )
     await user.click(screen.getByRole('button', { name: '检查更新' }))
     await user.click(screen.getByRole('button', { name: '打开诊断日志目录' }))
 

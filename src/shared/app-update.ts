@@ -1,4 +1,4 @@
-export const APP_UPDATE_RELEASES_URL = 'https://github.com/wuyouMaster/yuyu-desktop/releases/latest'
+export const APP_UPDATE_RELEASES_URL = 'https://github.com/wuyouMaster/yuyu-desktop/releases'
 
 export type AppUpdateStatus =
   | 'idle'

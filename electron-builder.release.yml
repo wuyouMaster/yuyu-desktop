@@ -1,0 +1,14 @@
+# Explicit public-app release configuration; never use for the private app.
+extends: ./electron-builder.yml
+mac:
+  target: [dmg, zip]
+  artifactName: yuyu-desktop-${version}-${arch}.${ext}
+win:
+  target: [nsis]
+nsis:
+  artifactName: yuyu-desktop-${version}-${arch}-setup.${ext}
+publish:
+  provider: github
+  owner: wuyouMaster
+  repo: yuyu-desktop
+  releaseType: draft

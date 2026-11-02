@@ -1325,7 +1325,7 @@ let appUpdateState = updateSimulation
 let openedUpdateDownloadUrl = ''
 handle('app-update:getState', () => appUpdateState)
 handle('app-update:openDownloadPage', () => {
-  openedUpdateDownloadUrl = 'https://github.com/wuyouMaster/yuyu-desktop/releases/latest'
+  openedUpdateDownloadUrl = 'https://github.com/wuyouMaster/yuyu-desktop/releases'
   return { success: true }
 })
 handle('app-update:getOpenedDownloadUrl', () => openedUpdateDownloadUrl)

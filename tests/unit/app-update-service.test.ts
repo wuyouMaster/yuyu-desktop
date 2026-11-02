@@ -50,7 +50,11 @@ describe('AppUpdateService', () => {
   })
 
   it('keeps update-not-available as the final state when checkForUpdates returns metadata', async () => {
-    const service = new AppUpdateService({ updateSourceAvailable: () => true, packagedRuntime: () => true, platform: 'win32' })
+    const service = new AppUpdateService({
+      updateSourceAvailable: () => true,
+      packagedRuntime: () => true,
+      platform: 'win32'
+    })
     mocks.updater.checkForUpdates.mockImplementationOnce(async () => {
       mocks.emit('checking-for-update')
       mocks.emit('update-not-available', { version: '1.9.0' })
@@ -71,7 +75,8 @@ describe('AppUpdateService', () => {
   it('simulates a realistic 2.0.0 download without invoking the real updater', async () => {
     vi.useFakeTimers()
     const states: ReturnType<AppUpdateService['getState']>[] = []
-    const service = new AppUpdateService({ updateSourceAvailable: () => true,
+    const service = new AppUpdateService({
+      updateSourceAvailable: () => true,
       simulationEnabled: true,
       simulationDurationMs: 1_000,
       currentVersion: () => '1.9.0'
@@ -114,7 +119,8 @@ describe('AppUpdateService', () => {
   })
 
   it('uses release-page delivery on unsigned macOS without downloading or installing', async () => {
-    const service = new AppUpdateService({ updateSourceAvailable: () => true,
+    const service = new AppUpdateService({
+      updateSourceAvailable: () => true,
       platform: 'darwin',
       packagedRuntime: () => true,
       currentVersion: () => '2.2.2',
@@ -146,7 +152,8 @@ describe('AppUpdateService', () => {
   })
 
   it('keeps automatic download and quitAndInstall on Windows', async () => {
-    const service = new AppUpdateService({ updateSourceAvailable: () => true,
+    const service = new AppUpdateService({
+      updateSourceAvailable: () => true,
       platform: 'win32',
       packagedRuntime: () => true,
       currentVersion: () => '2.2.2'
@@ -183,9 +190,17 @@ describe('AppUpdateService', () => {
 
 it('reports an unpublished build without a feed as unavailable, without checking another repository', async () => {
   vi.clearAllMocks()
-  const service = new AppUpdateService({packagedRuntime:()=>true,updateSourceAvailable:()=>false})
+  const service = new AppUpdateService({
+    packagedRuntime: () => true,
+    updateSourceAvailable: () => false
+  })
   const result = await service.check('manual')
-  expect(result).toMatchObject({success:false,state:{status:'unsupported',message:'当前构建尚未配置正式更新源'}})
+  expect(result).toMatchObject({
+    success: false,
+    state: { status: 'unsupported', message: '当前构建尚未配置正式更新源' }
+  })
   expect(mocks.updater.checkForUpdates).not.toHaveBeenCalled()
-  expect(APP_UPDATE_RELEASES_URL).toBe('https://github.com/wuyouMaster/yuyu-desktop/releases/latest')
+  expect((await service.download()).state.status).toBe('unsupported')
+  expect(mocks.updater.downloadUpdate).not.toHaveBeenCalled()
+  expect(APP_UPDATE_RELEASES_URL).toBe('https://github.com/wuyouMaster/yuyu-desktop/releases')
 })

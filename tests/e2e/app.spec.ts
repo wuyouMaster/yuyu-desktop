@@ -489,7 +489,7 @@ test('UPDATE-01 simulated startup update navigates to live progress and never ex
   }
 })
 
-test('UPDATE-02 unsigned macOS update opens the latest release without downloading', async () => {
+test('UPDATE-02 unsigned macOS update opens the releases page without downloading', async () => {
   const fixture = await launchTestApp({ unsignedMacUpdate: true })
   const pageErrors: Error[] = []
   fixture.page.on('pageerror', (error) => pageErrors.push(error))
@@ -502,7 +502,7 @@ test('UPDATE-02 unsigned macOS update opens the latest release without downloadi
     const openedUrl = await fixture.page.evaluate(() =>
       window.electron.ipcRenderer.invoke('app-update:getOpenedDownloadUrl')
     )
-    expect(openedUrl).toBe('https://github.com/wuyouMaster/yuyu-desktop/releases/latest')
+    expect(openedUrl).toBe('https://github.com/wuyouMaster/yuyu-desktop/releases')
     await expect(fixture.page.getByRole('progressbar')).toHaveCount(0)
     expect(pageErrors).toEqual([])
   } finally {
