@@ -62,10 +62,15 @@ corepack pnpm build:runtime-worker
 # YUYU_TEST_WECHAT_AUDIO_HOST / YUYU_TEST_WECHAT_HOST / YUYU_TEST_WECHAT_CDN_HOST
 corepack pnpm test:runtime:protocol
 node scripts/smoke-install-flow.mjs <absolute-candidate.zip> <absolute-synthetic-account>
+# 对固定清单中的公开 HTTPS 地址做无凭据安装验证
+node scripts/smoke-install-flow.mjs <absolute-candidate.zip> <absolute-synthetic-account> --published
+# 在本地目录包上验证相同公开安装与重启流程
+node scripts/smoke-install-flow.mjs <absolute-candidate.zip> <absolute-synthetic-account> --packaged <absolute-app-executable>
 ```
 
-`smoke-install-flow` 使用隔离配置、回环 HTTP、真实安装器及 Electron preload，验证未安装、
-匿名下载、重启、合成数据库连接与联系人。它不证明公网发布、真实账号或 Windows 行为。
+`smoke-install-flow` 使用隔离配置、真实安装器及 Electron preload，验证未安装、下载、重启、
+合成数据库连接与联系人。默认使用回环 HTTP；`--published` 使用固定清单中的公开 HTTPS 地址，
+不配置下载凭据。它不证明真实账号或 Windows 行为。
 macOS arm64 已进行本地验证；Windows 仅交叉编译，实测待安排。目录打包不是签名/公证发布。
 没有自动推送、发布或 Actions。
 

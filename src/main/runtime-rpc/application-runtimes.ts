@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { runtimeHome } from '../runtime-paths'
 import { runtimeCatalog } from '../runtime-catalog'
 import { RuntimeRpcError } from '../../shared/runtime-rpc'
@@ -34,7 +34,12 @@ export function createApplicationRuntime(
   const rpc = createInstalledRuntimeHost({
     home: runtimeHome(),
     item,
-    workerPath: join(__dirname, 'runtimeRpcWorker.js'),
+    // electron-vite may move this module into out/main/chunks while the worker
+    // remains an entry beside out/main/index.js.
+    workerPath: join(
+      basename(__dirname) === 'chunks' ? dirname(__dirname) : __dirname,
+      'runtimeRpcWorker.js'
+    ),
     shutdownGraceMs
   })
   let closing: Promise<void> | undefined

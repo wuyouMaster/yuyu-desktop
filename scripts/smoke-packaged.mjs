@@ -53,7 +53,9 @@ try {
   expect(skillRead.content).toContain('# YUYU Reader')
   const runtime = await page.evaluate(() => window.api.listRuntimeInstallations())
   expect(runtime.some((r) => r.status === 'installed')).toBe(false)
-  expect(runtime.find((r) => r.application === 'wechat').error).toContain('所需接口')
+  expect(runtime.find((r) => r.application === 'wechat')).toMatchObject({
+    version: '0.1.0-dev.13', status: 'not-installed'
+  })
   console.log(
     JSON.stringify({
       packaged: identity.packaged,
