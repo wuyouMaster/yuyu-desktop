@@ -282,10 +282,14 @@ export async function installRuntime({
     try {
       await fs.rename(stage, destination)
     } catch (error) {
-      if (!['EEXIST', 'ENOTEMPTY'].includes(error.code)) throw error
+      // Windows may report EPERM when a nonempty destination already exists.
+      // Accept it only after verifying the exact existing package; never quarantine
+      // or replace anything when the permission failure has another cause.
+      if (!['EEXIST', 'ENOTEMPTY', 'EPERM'].includes(error.code)) throw error
       try {
         await verifyRuntime(home, item)
       } catch {
+        if (error.code === 'EPERM') throw error
         // Keep corrupt bytes for diagnosis, but never activate or execute them.
         const quarantine = destination + '.invalid-' + randomUUID()
         await fs.rename(destination, quarantine)

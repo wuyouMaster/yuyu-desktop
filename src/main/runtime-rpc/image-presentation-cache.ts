@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { constants } from 'node:fs'
 import { mkdir, open, readdir, realpath, rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { RuntimeRpcError } from '../../shared/runtime-rpc'
+import { openRegularFile } from '../services/regular-file'
 import { mediaDecodeBytes, mediaRelativePathSchema } from '../../shared/wechat-media-files-protocol'
 
 const writes = new Map<string, Promise<void>>()
@@ -71,7 +71,7 @@ export class ImagePresentationCache {
     }
   }
   private async read(path: string, max: number): Promise<Buffer> {
-    const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
+    const file = await openRegularFile(path)
     try {
       const info = await file.stat()
       if (!info.isFile() || info.size > max) throw new RuntimeRpcError('IMAGE_CACHE_INVALID')

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createServer, type Server } from 'node:http'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
@@ -18,6 +19,7 @@ const servers: Server[] = []
 const sha = (b: Buffer): string => createHash('sha256').update(b).digest('hex')
 afterEach(async () => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   await Promise.all(
     servers.splice(0).map((s) => new Promise<void>((resolve) => s.close(() => resolve())))
   )
@@ -215,6 +217,36 @@ describe('fixed runtime installation', () => {
     expect((await readActive(home)).wechat.sha256).toBe(item.sha256)
     await verifyRuntime(home, item)
     await installRuntime({ home, archive, item })
+  })
+  it('accepts a Windows EPERM collision only when the existing package verifies', async () => {
+    const { home, archive, item } = await fixture()
+    await installRuntime({ home, archive, item })
+    const destination = await verifyRuntime(home, item)
+    const rename = fs.rename.bind(fs)
+    vi.spyOn(fs, 'rename').mockImplementation(async (from, to) => {
+      if (String(from).includes('.stage-') && String(to) === destination) {
+        throw Object.assign(new Error('synthetic permission error'), { code: 'EPERM' })
+      }
+      return rename(from, to)
+    })
+    await expect(installRuntime({ home, archive, item })).resolves.toMatchObject({
+      sha256: item.sha256
+    })
+    await writeFile(join(destination, 'helper'), 'corrupted')
+    await expect(installRuntime({ home, archive, item })).rejects.toMatchObject({ code: 'EPERM' })
+    expect(await readFile(join(destination, 'helper'), 'utf8')).toBe('corrupted')
+  })
+  it('does not activate a package when EPERM occurs without an existing destination', async () => {
+    const { home, archive, item } = await fixture()
+    const rename = fs.rename.bind(fs)
+    vi.spyOn(fs, 'rename').mockImplementation(async (from, to) => {
+      if (String(from).includes('.stage-')) {
+        throw Object.assign(new Error('synthetic permission error'), { code: 'EPERM' })
+      }
+      return rename(from, to)
+    })
+    await expect(installRuntime({ home, archive, item })).rejects.toMatchObject({ code: 'EPERM' })
+    expect(await readActive(home)).toEqual({})
   })
   it('keeps the active version after a corrupt archive is rejected', async () => {
     const { home, archive, item } = await fixture()
