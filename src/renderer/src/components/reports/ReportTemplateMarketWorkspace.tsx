@@ -19,11 +19,8 @@ import {
   type ReportTemplatePreviewItem
 } from './ReportTemplatePreview'
 
-/** 社区模板仓库：投稿模板从这里提交 PR。 */
-const TEMPLATE_REPOSITORY_URL = 'https://github.com/Wxw-Gu/TraceMemo-Templates'
-
 /**
- * 社区模板市场独立页面：日报工作区顶部标签页的第三个入口。
+ * 模板管理独立页面：日报工作区顶部标签页的第三个入口。
  *
  * 与「生成群聊日报」里的模板选择器读同一套 IPC 与远端 catalog。这里是模板市场的主入口：
  * 浏览、预览、安装、选用和卸载；生成页只保留选用与预览，不再重复展示市场列表。
@@ -313,7 +310,7 @@ export function ReportTemplateMarketWorkspace({
           <h1>社区模板市场</h1>
           <p>
             模板与默认日报读取同一份真实数据，只改变展示方式，适合手机长图分享、桌面归档与团队复盘。
-            这里可以浏览、预览、安装、选用和卸载社区模板。
+            这里可以浏览、预览和管理本地模板。
           </p>
         </div>
         <Button variant="outline" size="sm" disabled={loading} onClick={() => void refresh()}>
@@ -321,22 +318,11 @@ export function ReportTemplateMarketWorkspace({
         </Button>
       </header>
 
-      <section className="report-market-contribute" aria-label="投稿模板">
+      <section className="report-market-contribute" aria-label="远程模板市场状态">
         <div>
-          <strong>想把你做的模板分享给其他人？</strong>
-          <p>
-            如果想提供给其他人模板样式，可以来 YUYU-Templates
-            项目里提交 PR，方便给其他用户使用。
-          </p>
+          <strong>远程模板市场暂不可用</strong>
+          <p>内置模板和已安装的本地模板仍可使用。</p>
         </div>
-        <a
-          className="report-market-contribute-link"
-          href={TEMPLATE_REPOSITORY_URL}
-          target="_blank"
-          rel="noreferrer"
-        >
-          前往提交模板
-        </a>
       </section>
 
       <p className="report-market-summary" role="status">

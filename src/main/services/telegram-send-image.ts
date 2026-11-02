@@ -46,7 +46,7 @@ export async function prepareTelegramSendImage(path: string): Promise<{
     height = bytes.readUInt32BE(20)
   if (width < 1 || height < 1 || width > 1280 || height > 1280)
     throw new Error('Telegram 当前图片发送支持宽高不超过 1280 像素的 PNG')
-  const directory = await mkdtemp(join(tmpdir(), 'tracememo-telegram-image-'))
+  const directory = await mkdtemp(join(tmpdir(), 'yuyu-telegram-image-'))
   try {
     const copy = join(directory, 'image.png')
     await writeFile(copy, bytes, { mode: 0o600, flag: 'wx' })

@@ -82,7 +82,7 @@ export async function prepareTelegramSendFile(path: string): Promise<{
   } finally {
     await handle.close()
   }
-  const directory = await mkdtemp(join(tmpdir(), 'tracememo-telegram-file-'))
+  const directory = await mkdtemp(join(tmpdir(), 'yuyu-telegram-file-'))
   try {
     const copy = join(directory, name)
     await writeFile(copy, bytes, { mode: 0o600, flag: 'wx' })

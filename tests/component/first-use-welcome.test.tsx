@@ -62,7 +62,7 @@ describe('FirstUseWelcome', () => {
     expect(onOpenSearch).toHaveBeenCalledOnce()
     await user.click(screen.getByRole('button', { name: '配置 AI 模型' }))
     expect(onOpenAISettings).toHaveBeenCalledOnce()
-    expect(screen.getByRole('link', { name: '查看完整使用教程' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '查看项目说明' })).toHaveAttribute(
       'href',
       'https://github.com/wuyouMaster/yuyu-desktop#readme'
     )

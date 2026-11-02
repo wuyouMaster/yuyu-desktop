@@ -49,18 +49,7 @@ const exportStamp = (): string => {
   const pad = (value: number): string => String(value).padStart(2, '0')
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
 }
-const defaultExportRoot = (): string => join(app.getPath('documents'), 'TraceMemo', '导出')
-const legacyExportRoot = (): string => join(app.getPath('documents'), 'WechatExplorer', '导出')
-const resolveDefaultExportRoot = async (outputFolder?: string): Promise<string> => {
-  if (!outputFolder) return defaultExportRoot()
-  try {
-    await fs.access(join(legacyExportRoot(), outputFolder))
-    // Continue incremental exports in the legacy folder when it already exists.
-    return legacyExportRoot()
-  } catch {
-    return defaultExportRoot()
-  }
-}
+const defaultExportRoot = (): string => join(app.getPath('documents'), 'YUYU', '导出')
 const imageKeys = new ImageKeyConfigService()
 
 export interface HtmlExportConversation {
@@ -1059,7 +1048,7 @@ async function runSingleExport(
       request.format === 'html'
         ? options.outputFolderName || safeFilePart(request.outputName)
         : `${safeFilePart(request.outputName)}_${exportStamp()}`
-    const root = options.outputRoot || request.outputDirectory || (await resolveDefaultExportRoot(outputFolder))
+    const root = options.outputRoot || request.outputDirectory || defaultExportRoot()
     await fs.mkdir(root, { recursive: true })
     const outputDir = join(root, outputFolder)
     const outputPath =
@@ -1773,7 +1762,7 @@ async function runAllExport(
     }
 
     const outputFolder = safeFilePart(request.outputName)
-    const exportRoot = request.outputDirectory || (await resolveDefaultExportRoot(outputFolder))
+    const exportRoot = request.outputDirectory || defaultExportRoot()
     outputDir = join(exportRoot, outputFolder)
     const folderNames = conversationFolderNames(targets)
     let lastProgressAt = 0

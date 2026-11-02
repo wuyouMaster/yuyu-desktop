@@ -113,7 +113,7 @@ interface SelfInfo {
   accountRoot: string
 }
 
-const MAC_KEY_FAQ_URL = 'https://github.com/wuyouMaster/yuyu-desktop#接口边界'
+const MAC_KEY_FAQ_URL = 'https://github.com/wuyouMaster/yuyu-desktop#macos'
 const FIRST_USE_WELCOME_SEEN_KEY = 'yuyu_first_use_welcome_seen'
 const MESSAGE_MONITOR_DEBOUNCE_MS = 350
 const INITIAL_MESSAGE_COUNT = 20

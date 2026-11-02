@@ -8,9 +8,8 @@ test('REPORT-TEMPLATE-MARKET-E2E-01 reads, installs, restores, renders, and swit
   test.setTimeout(120_000)
   const userData = mkdtempSync(join(tmpdir(), 'yuyu-template-market-user-'))
   const outputDir = mkdtempSync(join(tmpdir(), 'yuyu-template-market-output-'))
-  // Public network availability is an explicit live check, not a prerequisite for regression.
-  const live = process.env.YUYU_TEMPLATE_MARKET_LIVE === '1'
-  const responses = live ? undefined : await templateMarketResponses()
+  // This isolated test entry uses a synthetic catalog; production has no source.
+  const responses = await templateMarketResponses()
   let network: Awaited<ReturnType<typeof installTemplateMarketResponses>> | undefined
   const launch = async (): ReturnType<typeof electron.launch> => {
     const launched = await electron.launch({
@@ -18,6 +17,7 @@ test('REPORT-TEMPLATE-MARKET-E2E-01 reads, installs, restores, renders, and swit
       env: {
         ...process.env,
         YUYU_TEMPLATE_TEST_USER_DATA: userData,
+        YUYU_TEMPLATE_TEST_MARKET_FIXTURE: '1',
         YUYU_REPORT_OUTPUT_DIR: outputDir
       }
     })
@@ -97,13 +97,13 @@ test('REPORT-TEMPLATE-MARKET-E2E-01 reads, installs, restores, renders, and swit
     const sourceCommit = catalog?.source?.commit
     expect(sourceCommit).toMatch(/^[a-f0-9]{40}$/)
     const entries = catalog!.templates
-    // Both the pinned fixture and the opt-in live catalog must satisfy the production contract.
+    // The pinned fixture must satisfy the same integrity checks used by a configured source.
     expect(entries.length).toBeGreaterThanOrEqual(2)
     for (const entry of entries) {
       expect(entry.interfaceVersion).toBe('1')
       expect(entry.status).toBe('published')
-      expect(entry.download).toContain(`/Wxw-Gu/TraceMemo-Templates/${sourceCommit}/`)
-      expect(entry.preview).toContain(`/Wxw-Gu/TraceMemo-Templates/${sourceCommit}/`)
+      expect(entry.download).toContain(`/fixture-owner/fixture-templates/${sourceCommit}/`)
+      expect(entry.preview).toContain(`/fixture-owner/fixture-templates/${sourceCommit}/`)
     }
 
     if (network) {

@@ -91,7 +91,7 @@ export class TelegramMediaDownloadService {
     let path: string | undefined
     if (media.kind !== 'photo') {
       const root =
-        this.options.outputRoot ?? join(homedir(), 'Library/Caches/TraceMemo/telegram-downloads')
+        this.options.outputRoot ?? join(homedir(), 'Library/Caches/YUYU/telegram-downloads')
       await mkdir(root, { recursive: true, mode: 0o700 })
       if ((await realpath(root)) !== root || !(await lstat(root)).isDirectory())
         throw new Error('附件缓存目录不可用')

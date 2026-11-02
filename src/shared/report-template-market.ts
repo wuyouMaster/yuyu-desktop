@@ -1,8 +1,5 @@
 import type { ReportTemplateOperationResult } from './report-template-package'
 
-export const REPORT_TEMPLATE_CATALOG_URL =
-  'https://raw.githubusercontent.com/Wxw-Gu/TraceMemo-Templates/main/catalog/v1/index.json'
-
 export interface ReportTemplateCatalogEntry {
   id: string
   version: string

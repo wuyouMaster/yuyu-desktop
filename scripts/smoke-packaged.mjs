@@ -51,6 +51,19 @@ try {
   const skillRead = await page.evaluate(() => window.api.readReaderSkill())
   expect(skillRead.success).toBe(true)
   expect(skillRead.content).toContain('# YUYU Reader')
+  const network = await app.evaluateHandle(() => {
+    const state = { requests: 0 }
+    globalThis.fetch = async () => { state.requests += 1; throw new Error('unexpected request') }
+    return state
+  })
+  const market = await page.evaluate(async () => ({
+    catalog: await window.api.listReportTemplateCatalog(),
+    install: await window.api.installReportTemplateFromCatalog('community.github.fixture.example', '1.0.0')
+  }))
+  expect(market.catalog).toMatchObject({ success: false, code: 'market_unavailable' })
+  expect(market.install).toMatchObject({ success: false, code: 'market_unavailable' })
+  expect(await network.evaluate((state) => state.requests)).toBe(0)
+  await network.dispose()
   const update = await page.evaluate(() => window.api.checkAppUpdate())
   expect(update).toMatchObject({ success: false, state: { status: 'unsupported' } })
   const runtime = await page.evaluate(() => window.api.listRuntimeInstallations())

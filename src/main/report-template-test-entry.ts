@@ -9,6 +9,7 @@ app.setPath('logs', path.join(userData, 'logs'))
 app.whenReady().then(async () => {
   const { registerReportTemplateIpc } = await import('./report-template-ipc')
   const { reportTemplateService } = await import('./report-template-service')
+  const { ReportTemplateMarketService } = await import('./report-template-market-service')
   const {
     deleteGeneratedReport,
     listGeneratedReports,
@@ -16,7 +17,13 @@ app.whenReady().then(async () => {
     updateGeneratedReportTemplate
   } = await import('./report-history-service')
   await reportTemplateService.recover()
-  registerReportTemplateIpc()
+  const fixtureMarket = process.env.YUYU_TEMPLATE_TEST_MARKET_FIXTURE === '1'
+    ? new ReportTemplateMarketService({
+        repository: 'fixture-owner/fixture-templates',
+        catalogUrl: 'https://raw.githubusercontent.com/fixture-owner/fixture-templates/main/catalog/v1/index.json'
+      })
+    : undefined
+  registerReportTemplateIpc(fixtureMarket)
   ipcMain.handle('report:listGenerated', () => listGeneratedReports())
   ipcMain.handle('report:saveGenerated', (_, request) => saveGeneratedReport(request))
   ipcMain.handle('report:updateGeneratedTemplate', (_, request) => updateGeneratedReportTemplate(request))

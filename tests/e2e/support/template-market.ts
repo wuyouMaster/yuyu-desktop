@@ -1,10 +1,9 @@
 import type { ElectronApplication } from '@playwright/test'
 import { ZipArchive } from 'archiver'
 import { createHash } from 'node:crypto'
-import {
-  REPORT_TEMPLATE_CATALOG_URL,
-  type ReportTemplateCatalog
-} from '../../../src/shared/report-template-market'
+import type { ReportTemplateCatalog } from '../../../src/shared/report-template-market'
+
+const REPORT_TEMPLATE_CATALOG_URL = 'https://raw.githubusercontent.com/fixture-owner/fixture-templates/main/catalog/v1/index.json'
 
 interface FixtureResponse {
   body: string
@@ -52,7 +51,7 @@ export async function templateMarketResponses(): Promise<Record<string, FixtureR
     )
     await Promise.all([ended, archive.finalize()])
     const bytes = Buffer.concat(chunks)
-    const download = `https://raw.githubusercontent.com/Wxw-Gu/TraceMemo-Templates/${commit}/packages/${id}/1.0.0.zip`
+    const download = `https://raw.githubusercontent.com/fixture-owner/fixture-templates/${commit}/packages/${id}/1.0.0.zip`
     responses[download] = { body: bytes.toString('base64'), type: 'application/zip' }
     templates.push({
       id,
@@ -66,7 +65,7 @@ export async function templateMarketResponses(): Promise<Record<string, FixtureR
       license: 'MIT',
       minAppVersion: null,
       download,
-      preview: `https://raw.githubusercontent.com/Wxw-Gu/TraceMemo-Templates/${commit}/previews/${id}.png`,
+      preview: `https://raw.githubusercontent.com/fixture-owner/fixture-templates/${commit}/previews/${id}.png`,
       sizeBytes: bytes.length,
       sha256: createHash('sha256').update(bytes).digest('hex'),
       status: 'published'
@@ -74,7 +73,7 @@ export async function templateMarketResponses(): Promise<Record<string, FixtureR
   }
   const catalog: ReportTemplateCatalog = {
     schemaVersion: '1',
-    source: { repository: 'Wxw-Gu/TraceMemo-Templates', commit },
+    source: { repository: 'fixture-owner/fixture-templates', commit },
     status: 'published',
     templates
   }

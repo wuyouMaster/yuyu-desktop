@@ -1,12 +1,12 @@
 import { ipcMain } from 'electron'
 import { exportGroupReport } from './group-report-service'
 import { reportTemplateService } from './report-template-service'
-import { reportTemplateMarketService } from './report-template-market-service'
+import { reportTemplateMarketService, type ReportTemplateMarketService } from './report-template-market-service'
 import type { GroupReportExportRequest } from '../shared/group-report'
 
 let registered = false
 
-export function registerReportTemplateIpc(): void {
+export function registerReportTemplateIpc(market: ReportTemplateMarketService = reportTemplateMarketService): void {
   if (registered) return
   registered = true
   ipcMain.handle('report-template:list', () => reportTemplateService.list())
@@ -33,9 +33,9 @@ export function registerReportTemplateIpc(): void {
       }
     }
   })
-  ipcMain.handle('report-template-market:list', () => reportTemplateMarketService.listCatalog())
+  ipcMain.handle('report-template-market:list', () => market.listCatalog())
   ipcMain.handle('report-template-market:install', (_, id: string, version: string) =>
-    reportTemplateMarketService.installFromCatalog(String(id || ''), String(version || ''))
+    market.installFromCatalog(String(id || ''), String(version || ''))
   )
   ipcMain.handle('report:export', (_, request: GroupReportExportRequest) => exportGroupReport(request))
 }

@@ -20,43 +20,6 @@ export class DatabaseKeyStore {
     return path.join(this.directoryPath, `${id}.bin`)
   }
 
-  private filePathForId(id: string): string {
-    return path.join(this.directoryPath, id + '.bin')
-  }
-
-  async saveMigratedFile(fileName: string, rawKey: string): Promise<boolean> {
-    const key = normalizeDatabaseKey(rawKey)
-    if (!/^[0-9a-f]{64}\.bin$/i.test(fileName) || !isValidDatabaseKey(key)) return false
-    if (!safeStorage.isEncryptionAvailable()) return false
-    const targetPath = this.filePathForId(fileName.slice(0, -4).toLowerCase())
-    const tempPath = targetPath + '.tmp-' + process.pid
-    try {
-      await fs.ensureDir(this.directoryPath)
-      await fs.writeFile(tempPath, safeStorage.encryptString(key), { mode: 0o600 })
-      await fs.chmod(tempPath, 0o600)
-      const verified = normalizeDatabaseKey(safeStorage.decryptString(await fs.readFile(tempPath)))
-      if (!isValidDatabaseKey(verified) || verified.toLowerCase() !== key.toLowerCase()) {
-        return false
-      }
-      await fs.move(tempPath, targetPath, { overwrite: true })
-      return true
-    } finally {
-      await fs.remove(tempPath).catch(() => undefined)
-    }
-  }
-
-  async loadMigratedFile(fileName: string): Promise<string | undefined> {
-    if (!/^[0-9a-f]{64}\.bin$/i.test(fileName)) return undefined
-    const filePath = this.filePathForId(fileName.slice(0, -4).toLowerCase())
-    if (!(await fs.pathExists(filePath)) || !safeStorage.isEncryptionAvailable()) return undefined
-    try {
-      const key = normalizeDatabaseKey(safeStorage.decryptString(await fs.readFile(filePath)))
-      return isValidDatabaseKey(key) ? key : undefined
-    } catch {
-      return undefined
-    }
-  }
-
   async getStatus(accountRoot: string): Promise<{ saved: boolean; encryptionAvailable: boolean }> {
     return {
       saved: Boolean(accountRoot) && (await fs.pathExists(this.filePath(accountRoot))),

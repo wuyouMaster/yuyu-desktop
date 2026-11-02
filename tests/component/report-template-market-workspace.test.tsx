@@ -71,17 +71,14 @@ describe('ReportTemplateMarketWorkspace', () => {
     expect(screen.queryByRole('button', { name: '当前使用' })).not.toBeInTheDocument()
   })
 
-  it('links to the community template repository for submitting new templates', async () => {
+  it('explains that remote distribution is unavailable while local templates remain usable', async () => {
+    listReportTemplateCatalog.mockResolvedValue({ success: false, code: 'market_unavailable', error: '远程模板市场暂不可用，本地模板仍可使用' })
     render(<ReportTemplateMarketWorkspace value="v1" onChange={vi.fn()} />)
 
-    const link = await screen.findByRole('link', { name: '前往提交模板' })
-    expect(link).toHaveAttribute('href', 'https://github.com/Wxw-Gu/TraceMemo-Templates')
-    expect(link).toHaveAttribute('target', '_blank')
-    expect(
-      screen.getByText(
-        '如果想提供给其他人模板样式，可以来 YUYU-Templates 项目里提交 PR，方便给其他用户使用。'
-      )
-    ).toBeVisible()
+    expect(await screen.findByText('远程模板市场暂不可用')).toBeVisible()
+    expect(screen.getByText('内置模板和已安装的本地模板仍可使用。')).toBeVisible()
+    expect(await screen.findByText('极简速读')).toBeVisible()
+    expect(screen.queryByRole('link', { name: '前往提交模板' })).not.toBeInTheDocument()
   })
 
   it('uninstalls a market template and refreshes the list', async () => {

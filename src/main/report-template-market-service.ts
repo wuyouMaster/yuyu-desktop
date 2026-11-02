@@ -9,7 +9,6 @@ import {
   type ReportTemplateOperationResult
 } from '../shared/report-template-package'
 import {
-  REPORT_TEMPLATE_CATALOG_URL,
   type ReportTemplateCatalog,
   type ReportTemplateCatalogEntry,
   type ReportTemplateCatalogInstallResult,
@@ -24,7 +23,12 @@ const SAFE_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/
 const SHA256 = /^[a-f0-9]{64}$/
 const COMMIT = /^[a-f0-9]{40}$/
 const RAW_HOST = 'raw.githubusercontent.com'
-const RAW_REPOSITORY_PREFIX = '/Wxw-Gu/TraceMemo-Templates/'
+export interface ReportTemplateMarketSource {
+  repository: string
+  catalogUrl: string
+}
+
+const MARKET_UNAVAILABLE = '远程模板市场暂不可用，本地模板仍可使用'
 
 const operationError = (fallbackCode: string, error: unknown): ReportTemplateOperationResult => ({
   success: false,
@@ -32,7 +36,7 @@ const operationError = (fallbackCode: string, error: unknown): ReportTemplateOpe
   error: error instanceof Error ? error.message : String(error)
 })
 
-const assertAllowedRemoteUrl = (value: unknown, label: string): URL => {
+const assertAllowedRemoteUrl = (value: unknown, label: string, repository: string): URL => {
   let parsed: URL
   try {
     parsed = new URL(String(value || ''))
@@ -47,15 +51,15 @@ const assertAllowedRemoteUrl = (value: unknown, label: string): URL => {
     parsed.password ||
     parsed.search ||
     parsed.hash ||
-    !parsed.pathname.startsWith(RAW_REPOSITORY_PREFIX)
+    !parsed.pathname.startsWith(`/${repository}/`)
   ) {
     throw new ReportTemplateError('invalid_catalog', `${label} 只允许 GitHub raw HTTPS 地址`)
   }
   return parsed
 }
 
-const assertAllowedPackageUrl = (value: unknown, label: string): URL => {
-  const parsed = assertAllowedRemoteUrl(value, label)
+const assertAllowedPackageUrl = (value: unknown, label: string, repository: string): URL => {
+  const parsed = assertAllowedRemoteUrl(value, label, repository)
   const segments = parsed.pathname.split('/').filter(Boolean)
   if (segments.length < 4 || !COMMIT.test(segments[2])) {
     throw new ReportTemplateError('invalid_catalog', `${label} 必须固定到模板仓库 commit`)
@@ -105,7 +109,7 @@ const fetchBytes = async (url: URL, maxBytes: number): Promise<Buffer> => {
   return Buffer.concat(chunks, total)
 }
 
-const validateCatalogEntry = (value: unknown): ReportTemplateCatalogEntry => {
+const validateCatalogEntry = (value: unknown, repository: string): ReportTemplateCatalogEntry => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new ReportTemplateError('invalid_catalog', '目录条目必须是对象')
   }
@@ -127,8 +131,8 @@ const validateCatalogEntry = (value: unknown): ReportTemplateCatalogEntry => {
     throw new ReportTemplateError('invalid_catalog', `${id}@${version} 目录名称或作者无效`)
   }
   if (!SHA256.test(String(entry.sha256 || ''))) throw new ReportTemplateError('invalid_catalog', `${id}@${version} SHA-256 无效`)
-  const download = assertAllowedPackageUrl(entry.download, 'download')
-  const preview = entry.preview === undefined || entry.preview === null ? undefined : assertAllowedPackageUrl(entry.preview, 'preview')
+  const download = assertAllowedPackageUrl(entry.download, 'download', repository)
+  const preview = entry.preview === undefined || entry.preview === null ? undefined : assertAllowedPackageUrl(entry.preview, 'preview', repository)
   const platform = entry.platform === 'mobile' || entry.platform === 'desktop' || entry.platform === 'default' ? entry.platform : undefined
   const tags = Array.isArray(entry.tags) && entry.tags.every((tag) => typeof tag === 'string') ? entry.tags : []
   return {
@@ -151,7 +155,7 @@ const validateCatalogEntry = (value: unknown): ReportTemplateCatalogEntry => {
   }
 }
 
-const parseCatalog = (bytes: Buffer): ReportTemplateCatalog => {
+const parseCatalog = (bytes: Buffer, repository: string): ReportTemplateCatalog => {
   let value: unknown
   try {
     value = JSON.parse(bytes.toString('utf8'))
@@ -166,7 +170,7 @@ const parseCatalog = (bytes: Buffer): ReportTemplateCatalog => {
     throw new ReportTemplateError('invalid_catalog', '远端模板目录版本或状态无效')
   }
   const seen = new Set<string>()
-  const templates = raw.templates.map(validateCatalogEntry)
+  const templates = raw.templates.map((entry) => validateCatalogEntry(entry, repository))
   for (const entry of templates) {
     const key = `${entry.id}@${entry.version}`
     if (seen.has(key)) throw new ReportTemplateError('invalid_catalog', `目录包含重复模板：${key}`)
@@ -177,7 +181,7 @@ const parseCatalog = (bytes: Buffer): ReportTemplateCatalog => {
     : undefined
   if (
     !source ||
-    source.repository !== 'Wxw-Gu/TraceMemo-Templates' ||
+    source.repository !== repository ||
     !COMMIT.test(String(source.commit || ''))
   ) {
     throw new ReportTemplateError('invalid_catalog', '目录 source.repository 或 source.commit 无效')
@@ -199,27 +203,34 @@ const parseCatalog = (bytes: Buffer): ReportTemplateCatalog => {
   }
 }
 
-const fetchCatalog = async (): Promise<ReportTemplateCatalog> => {
-  const url = assertAllowedRemoteUrl(REPORT_TEMPLATE_CATALOG_URL, 'catalog')
-  return parseCatalog(await fetchBytes(url, CATALOG_MAX_BYTES))
+const fetchCatalog = async (source: ReportTemplateMarketSource): Promise<ReportTemplateCatalog> => {
+  if (!/^[A-Za-z0-9-]+\/[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(source.repository)) {
+    throw new ReportTemplateError('invalid_catalog', '模板仓库标识无效')
+  }
+  const url = assertAllowedRemoteUrl(source.catalogUrl, 'catalog', source.repository)
+  return parseCatalog(await fetchBytes(url, CATALOG_MAX_BYTES), source.repository)
 }
 
 export class ReportTemplateMarketService {
+  constructor(private readonly source: ReportTemplateMarketSource | null = null) {}
+
   async listCatalog(): Promise<ReportTemplateCatalogResult> {
+    if (!this.source) return { success: false, code: 'market_unavailable', error: MARKET_UNAVAILABLE }
     try {
-      return { success: true, catalog: await fetchCatalog() }
+      return { success: true, catalog: await fetchCatalog(this.source) }
     } catch (error) {
       return operationError('catalog_fetch_failed', error) as ReportTemplateCatalogResult
     }
   }
 
   async installFromCatalog(id: string, version: string): Promise<ReportTemplateCatalogInstallResult> {
+    if (!this.source) return { success: false, code: 'market_unavailable', error: MARKET_UNAVAILABLE }
     let temporaryDirectory: string | undefined
     try {
-      const catalog = await fetchCatalog()
+      const catalog = await fetchCatalog(this.source)
       const entry = catalog.templates.find((candidate) => candidate.id === id && candidate.version === version)
       if (!entry) return { success: false, code: 'catalog_template_not_found', error: `远端目录不存在：${id}@${version}` }
-      const bytes = await fetchBytes(assertAllowedPackageUrl(entry.download, 'download'), REPORT_TEMPLATE_LIMITS.maxCompressedBytes)
+      const bytes = await fetchBytes(assertAllowedPackageUrl(entry.download, 'download', this.source.repository), REPORT_TEMPLATE_LIMITS.maxCompressedBytes)
       const digest = crypto.createHash('sha256').update(bytes).digest('hex')
       if (bytes.length !== entry.sizeBytes || digest !== entry.sha256) {
         return { success: false, code: 'download_integrity_failed', error: `模板包校验失败：${id}@${version}`, catalogEntry: entry }

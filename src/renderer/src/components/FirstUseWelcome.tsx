@@ -87,7 +87,7 @@ export function FirstUseWelcome({
             target="_blank"
             rel="noreferrer"
           >
-            查看完整使用教程
+            查看项目说明
           </a>
         </div>
       </DialogContent>

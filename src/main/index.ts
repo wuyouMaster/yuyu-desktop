@@ -72,7 +72,6 @@ import type {
   AIVisionTestRequest
 } from '../shared/ai-provider'
 import { DatabaseKeyStore } from './database-key-store'
-import { migrateLegacyTraceMemoDatabaseKeys } from './legacy-database-key-migration'
 import { apiTokenStore } from './api-token-store'
 import { ImageKeyConfigService } from './services/image-key-config-service'
 import { AIProviderService } from './services/ai-provider-service'
@@ -643,16 +642,6 @@ function createWindow(): void {
 // Electron 初始化完成并准备创建浏览器窗口后，将调用此方法
 // 某些 API 只能在此事件发生后使用
 app.whenReady().then(async () => {
-  const legacyKeyMigration = await migrateLegacyTraceMemoDatabaseKeys(databaseKeyStore)
-  if (legacyKeyMigration.sourceFound) {
-    console.log(
-      '[DatabaseKey] migrated legacy keys=' +
-        legacyKeyMigration.migrated +
-        ' failed=' +
-        legacyKeyMigration.failed
-    )
-  }
-
   nativeModuleCompatibilityService = new NativeModuleCompatibilityService({
     moduleRoots: [
       join(app.getPath('userData'), 'native-modules'),
