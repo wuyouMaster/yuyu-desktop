@@ -12,4 +12,3 @@ playwright-report/
 
 build/icon.png
 examples/*.zip
-tests/e2e/__screenshots__/

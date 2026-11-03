@@ -60,11 +60,11 @@ corepack pnpm exec playwright test
 corepack pnpm build:unpack
 ```
 
-视觉基线为原私仓已审核的外部输入，不随公开源码分发；设置 `YUYU_VISUAL_BASELINE_ROOT`
-到包含平台子目录的基线根目录，`YUYU_TEST_ICON` 指向原合成截图输入图标。缺失基线会失败，
-不会自动创建或更新。当前原基线还反映早于多数据源/运行时入口改造的界面；差异必须单独
-核对，不能以更新基线或放宽断言处理。Windows 专用手动目录用例在 macOS 的既有平台跳过
-保持原状，不用它证明 Windows 已通过。
+macOS 视觉基线位于 `tests/e2e/__screenshots__/darwin/`，使用公开的合成聊天 fixture 和
+本仓库生成的图标，不依赖私仓文件。普通测试使用严格全页或对应控件截图断言；缺失或不匹配
+会失败。界面有预期变化时，须逐张审阅合成内容和布局，显式更新基线并重新运行普通比较，
+不要用更新基线掩盖未查明的回归。Windows 专用手动目录用例在 macOS 的既有平台跳过保持原状，
+不代表 Windows 已通过。
 
 真实原生合成测试需明确提供候选与 fixtures，缺失时失败：
 

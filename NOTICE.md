@@ -9,5 +9,6 @@ modification notices in the runtime. No upstream script, offsets, native patch i
 private research registry is distributed in this application repository. Runtime release artifacts
 have their own source/notice requirements and must be reviewed independently before publication.
 
-Generated app icons derive from the reviewed SVG source. Visual baseline images, binaries, models,
-source archives, logs and test outputs are external or generated inputs and are not repository files.
+Generated app icons derive from the reviewed SVG source. The macOS visual baselines are reviewed
+synthetic test fixtures. Binaries, models, source archives, logs and test outputs are external or
+generated inputs and are not repository files.
