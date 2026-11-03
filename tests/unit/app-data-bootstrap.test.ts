@@ -39,4 +39,16 @@ describe('application bootstrap', () => {
     expect(fs.readFileSync(previous, 'utf8')).toBe('existing encrypted fixture')
     expect(fs.existsSync(path.join(state.root, 'YUYU', 'database-keys'))).toBe(false)
   })
+
+  it('keeps logs inside an explicitly isolated user data directory', async () => {
+    state.root = fs.mkdtempSync(path.join(os.tmpdir(), 'yuyu-bootstrap-fixture-'))
+    const isolated = path.join(state.root, 'synthetic-profile')
+    vi.stubEnv('YUYU_USER_DATA', isolated)
+
+    await import('../../src/main/app-data-bootstrap')
+
+    expect(state.setPath).toHaveBeenCalledWith('userData', isolated)
+    expect(state.setPath).toHaveBeenCalledWith('sessionData', isolated)
+    expect(state.setPath).toHaveBeenCalledWith('logs', path.join(isolated, 'logs'))
+  })
 })
