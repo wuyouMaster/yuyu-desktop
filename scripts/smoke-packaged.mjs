@@ -4,17 +4,25 @@ import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, isAbsolute } from 'node:path'
 const executable = process.argv[2]
+const fresh = process.argv[3] === '--fresh'
+const restrictedParent = process.argv[4] === '--restricted-parent'
 if (!executable || !isAbsolute(executable)) throw new Error('Absolute packaged executable required')
+if (process.argv[3] && !fresh) throw new Error('Expected --fresh or no additional argument')
+if (process.argv[4] && (!fresh || !restrictedParent)) throw new Error('Expected --restricted-parent after --fresh')
+// macOS cannot nest Chromium's sandbox within the read-deny profile used by
+// this synthetic-account test. The outer profile remains the access boundary.
+const appArgs = restrictedParent ? ['--no-sandbox'] : []
 const home = await mkdtemp(join(tmpdir(), 'synthetic-packaged-app-'))
-await writeFile(
-  join(home, 'settings.json'),
-  JSON.stringify({
-    dbRoot: join(home, 'synthetic-account'),
-    imageKeyRoot: join(home, 'synthetic-account'),
-    autoLogin: false,
-    apiEnabled: false
-  })
-)
+if (!fresh)
+  await writeFile(
+    join(home, 'settings.json'),
+    JSON.stringify({
+      dbRoot: join(home, 'synthetic-account'),
+      imageKeyRoot: join(home, 'synthetic-account'),
+      autoLogin: false,
+      apiEnabled: false
+    })
+  )
 const env = {
   ...process.env,
   YUYU_USER_DATA: home,
@@ -33,7 +41,7 @@ for (const key of [
   delete env[key]
 let app
 try {
-  app = await electron.launch({ executablePath: executable, args: [], env, timeout: 30000 })
+  app = await electron.launch({ executablePath: executable, args: appArgs, env, timeout: 30000 })
   app.process().stderr.on('data', (b) => process.stderr.write(b))
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
@@ -42,6 +50,12 @@ try {
   await expect(page.getByRole('heading', { name: '从一个数据源开始' })).toBeVisible()
   // The disabled API must not require keychain access before the first window.
   expect(existsSync(join(home, 'local-api-token.bin'))).toBe(false)
+  const api = await page.evaluate(async () => ({
+    enabled: (await window.api.getSettings()).settings.apiEnabled,
+    status: await window.api.apiStatus()
+  }))
+  expect(api.enabled).toBe(false)
+  expect(api.status.running).toBe(false)
   const identity = await app.evaluate(({ app }) => ({
     packaged: app.isPackaged,
     path: app.getAppPath()
@@ -75,9 +89,26 @@ try {
     version: '0.1.0-dev.13',
     status: 'not-installed'
   })
+  if (fresh) {
+    await app.close()
+    app = undefined
+    app = await electron.launch({ executablePath: executable, args: appArgs, env, timeout: 30000 })
+    const reopened = await app.firstWindow()
+    await reopened.waitForLoadState('domcontentloaded')
+    await expect(reopened.getByRole('heading', { name: '从一个数据源开始' })).toBeVisible()
+    const afterRestart = await reopened.evaluate(async () => ({
+      enabled: (await window.api.getSettings()).settings.apiEnabled,
+      status: await window.api.apiStatus()
+    }))
+    expect(afterRestart.enabled).toBe(false)
+    expect(afterRestart.status.running).toBe(false)
+    expect(existsSync(join(home, 'local-api-token.bin'))).toBe(false)
+  }
   console.log(
     JSON.stringify({
       packaged: identity.packaged,
+      freshProfile: fresh,
+      restrictedParent,
       archive: true,
       workspace: true,
       readerSkill: true,

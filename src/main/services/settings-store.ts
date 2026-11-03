@@ -108,7 +108,7 @@ const defaultDbRoot = getDefaultDbRoot()
 
 const DEFAULT_SETTINGS: AppSettings = {
   dbRoot: defaultDbRoot,
-  apiEnabled: true,
+  apiEnabled: false,
   apiHost: '127.0.0.1',
   apiPort: 6131,
   imageKeyRoot: defaultDbRoot,
@@ -150,6 +150,9 @@ export function loadSettings(): AppSettings {
     if (fs.existsSync(SETTINGS_FILE)) {
       const raw = fs.readJsonSync(SETTINGS_FILE) as Partial<AppSettings>
       cache = { ...DEFAULT_SETTINGS, ...raw }
+      // Existing settings without this field inherited the old enabled default.
+      // Preserve that behavior while new profiles default to a stopped API.
+      if (!Object.prototype.hasOwnProperty.call(raw, 'apiEnabled')) cache.apiEnabled = true
       if (process.platform === 'win32' && !isUsableDbRoot(cache.dbRoot)) {
         cache.dbRoot = getDefaultDbRoot()
       }
