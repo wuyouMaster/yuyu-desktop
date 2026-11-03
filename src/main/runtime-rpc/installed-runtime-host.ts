@@ -3,6 +3,7 @@ import { verifyRuntimeSync, type RuntimePackage } from '../../../scripts/runtime
 import { RuntimeRpcBridgeClient } from './bridge-client'
 import { RuntimeRpcError } from '../../shared/runtime-rpc'
 import type { OwnedDatabaseTransport } from './wechat-database-runtime'
+import { runtimeHostPath } from './runtime-host-path'
 
 export interface InstalledRuntimeHostOptions {
   home: string
@@ -10,22 +11,17 @@ export interface InstalledRuntimeHostOptions {
   workerPath: string
   shutdownGraceMs?: number
 }
-const executables: Record<string, string> = {
-  wechat: 'wechat-storage-host',
-  telegram: 'telegram-storage-host'
-}
 /** Main-process catalog inputs only. No arbitrary executable/arguments from renderer IPC. */
 export function createInstalledRuntimeHost(
   options: InstalledRuntimeHostOptions
 ): OwnedDatabaseTransport {
-  const name = executables[options.item.application]
+  const executable = runtimeHostPath(options.item.application, options.item.target)
   if (
-    !name ||
+    !executable ||
     ![options.home, options.workerPath].every(isAbsolute) ||
     options.item.target !== `${process.platform}-${process.arch}`
   )
     throw new RuntimeRpcError('INVALID_ARGUMENT')
-  const executable = name + (process.platform === 'win32' ? '.exe' : '')
   if (!options.item.files.includes(executable)) throw new RuntimeRpcError('CAPABILITY_UNAVAILABLE')
   let directory: string
   try {

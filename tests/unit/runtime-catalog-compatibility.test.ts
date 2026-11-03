@@ -24,6 +24,15 @@ describe('runtime compatibility before download', () => {
       runtimeCompatibilityError(item('wechat', 'win32-x64', ['wechat-storage-host.exe']))
     ).toBeUndefined()
     expect(
+      runtimeCompatibilityError(item('telegram', 'darwin-arm64', ['telegram/telegram-storage-host']))
+    ).toBeUndefined()
+    expect(
+      runtimeCompatibilityError(item('telegram', 'darwin-arm64', ['telegram-storage-host']))
+    ).toBeDefined()
+    expect(
+      runtimeCompatibilityError(item('telegram', 'win32-x64', ['telegram/telegram-storage-host.exe']))
+    ).toBeUndefined()
+    expect(
       runtimeCompatibilityError(item('dingtalk', 'darwin-arm64', ['dingtalk/dtstore']))
     ).toBeUndefined()
   })

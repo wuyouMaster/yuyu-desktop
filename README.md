@@ -72,6 +72,7 @@ corepack pnpm build:unpack
 corepack pnpm build:runtime-worker
 # YUYU_TEST_WECHAT_ARCHIVE / YUYU_TEST_DATABASE_DETAILS_ROOT / YUYU_TEST_HEVC_FIXTURE
 # YUYU_TEST_WECHAT_AUDIO_HOST / YUYU_TEST_WECHAT_HOST / YUYU_TEST_WECHAT_CDN_HOST
+# YUYU_TEST_TELEGRAM_ARCHIVE / YUYU_TEST_TELEGRAM_FIXTURE (synthetic JSON)
 corepack pnpm test:runtime:protocol
 node scripts/smoke-install-flow.mjs <absolute-candidate.zip> <absolute-synthetic-account>
 # 对固定清单中的公开 HTTPS 地址做无凭据安装验证
@@ -85,6 +86,11 @@ node scripts/smoke-install-flow.mjs <absolute-candidate.zip> <absolute-synthetic
 不配置下载凭据。它不证明真实账号或 Windows 行为。
 macOS arm64 已进行本地验证；Windows 仅交叉编译，实测待安排。目录打包不是签名/公证发布。
 没有自动推送、发布或 Actions。
+
+Telegram 候选包的 storage host 位于 `telegram/telegram-storage-host`。兼容检查和启动使用同一
+固定路径；已公开的 dev.2 不含该 host，仍会标记为不兼容。只有在后续候选发布并验证公开
+下载后才能更新默认目录。以上 Telegram 协议测试从候选 ZIP 安装并读取明确提供的合成数据，
+不会访问真实账号。
 
 ## 来源与交付
 

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { createHash } from 'node:crypto'
 import type { RuntimePackage } from '../../scripts/runtime-store.mjs'
 const mocks = vi.hoisted(() => ({ starts: vi.fn() }))
@@ -20,20 +20,21 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 const sha = (value: string) => createHash('sha256').update(value).digest('hex')
-function fixture() {
+function fixture(application: 'wechat' | 'telegram' = 'wechat') {
   const home = mkdtempSync(join(tmpdir(), 'synthetic-host-'))
   dirs.push(home)
-  const name = 'wechat-storage-host' + (process.platform === 'win32' ? '.exe' : '')
+  const name = (application === 'wechat' ? 'wechat-storage-host' : 'telegram/telegram-storage-host') +
+    (process.platform === 'win32' ? '.exe' : '')
   const manifest = JSON.stringify({
     schemaVersion: 1,
-    application: 'wechat',
+    application,
     version: '0.1.0-test',
     target: `${process.platform}-${process.arch}`,
     sourceCommit: 'a'.repeat(40),
     files: [{ path: name, size: 7, sha256: sha('fixture'), mode: 493 }]
   })
   const item: RuntimePackage = {
-    application: 'wechat',
+    application,
     version: '0.1.0-test',
     target: `${process.platform}-${process.arch}`,
     sourceCommit: 'a'.repeat(40),
@@ -44,9 +45,10 @@ function fixture() {
     url: 'https://example.invalid/fixture.zip',
     releaseStatus: 'development-only'
   }
-  const root = join(home, 'packages', 'wechat', item.sha256)
+  const root = join(home, 'packages', application, item.sha256)
   mkdirSync(root, { recursive: true })
   writeFileSync(join(root, 'runtime-manifest.json'), manifest)
+  mkdirSync(dirname(join(root, name)), { recursive: true })
   writeFileSync(join(root, name), 'fixture')
   chmodSync(join(root, name), 0o755)
   return { home, root, name, item, workerPath: join(home, 'synthetic-worker.js') }
@@ -67,6 +69,22 @@ describe('verified installed runtime ownership', () => {
           : {})
       },
       shutdownGraceMs: 7000
+    })
+  })
+  it('starts the verified Telegram host inside its packaged directory', () => {
+    const f = fixture('telegram')
+    createInstalledRuntimeHost(f)
+    expect(mocks.starts).toHaveBeenCalledExactlyOnceWith(f.workerPath, {
+      executable: join(f.root, f.name),
+      env: {
+        PATH: '',
+        LANG: 'C.UTF-8',
+        LC_ALL: 'C.UTF-8',
+        ...(process.platform === 'win32' && process.env.SystemRoot
+          ? { SystemRoot: process.env.SystemRoot }
+          : {})
+      },
+      shutdownGraceMs: undefined
     })
   })
   it.each(['bytes', 'manifest', 'symlink', 'missing'] as const)(

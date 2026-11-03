@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
 import bundled from '../../runtime.lock.json'
 import { selectRuntime, type RuntimePackage } from '../../scripts/runtime-store.mjs'
+import { runtimeHostPath } from './runtime-rpc/runtime-host-path'
 // Explicit developer fixture catalog; never controlled by renderer IPC or packaged builds.
 export function runtimeCatalog(): { packages: RuntimePackage[] } {
   const file = process.env.YUYU_RUNTIME_TEST_CATALOG
@@ -18,13 +19,8 @@ export function runtimeCatalog(): { packages: RuntimePackage[] } {
 
 /** A checksum-valid archive may still predate this application's protocol. */
 export function runtimeCompatibilityError(item: RuntimePackage): string | undefined {
-  const host =
-    item.application === 'wechat'
-      ? 'wechat-storage-host'
-      : item.application === 'telegram'
-        ? 'telegram-storage-host'
-        : undefined
-  if (host && !item.files.includes(host + (item.target.startsWith('win32-') ? '.exe' : ''))) {
+  const host = runtimeHostPath(item.application, item.target)
+  if (host && !item.files.includes(host)) {
     return '此运行时版本尚未提供应用所需接口，请等待兼容版本发布后安装'
   }
   return undefined
