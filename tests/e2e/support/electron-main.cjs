@@ -708,20 +708,24 @@ handle('key:clearSavedDbKey', () => {
   savedKey = ''
   return { success: true }
 })
-handle('key:getEnvironment', () => ({
-  platform: process.platform,
-  osVersion: process.platform === 'win32' ? 'Windows fixture' : 'macOS fixture',
-  appVersion: 'v2.2.0',
-  wechatVersion: '4.1.9.57',
-  dataStructureVersion: settings.dbRoot === 'fixture-account' ? '微信 4.x（WCDB）' : '未检测到',
-  dataDirectoryDetected: settings.dbRoot === 'fixture-account',
-  diagnosticSummary: 'YUYU: v2.2.0\n数据目录: 已检测到',
-  autoDetectSupported: true,
-  wechatRunning: true,
-  accountIdentified: connected,
-  dbConnected: connected,
-  encryptionAvailable: true
-}))
+globalThis.syntheticKeyEnvironmentReads = 0
+handle('key:getEnvironment', () => {
+  globalThis.syntheticKeyEnvironmentReads++
+  return {
+    platform: process.platform,
+    osVersion: process.platform === 'win32' ? 'Windows fixture' : 'macOS fixture',
+    appVersion: 'v2.2.0',
+    wechatVersion: '4.1.9.57',
+    dataStructureVersion: settings.dbRoot === 'fixture-account' ? '微信 4.x（WCDB）' : '未检测到',
+    dataDirectoryDetected: settings.dbRoot === 'fixture-account',
+    diagnosticSummary: 'YUYU: v2.2.0\n数据目录: 已检测到',
+    autoDetectSupported: true,
+    wechatRunning: true,
+    accountIdentified: connected,
+    dbConnected: connected,
+    encryptionAvailable: true
+  }
+})
 handle('key:readClipboardDbKey', () => ({ success: true, value: VALID_KEY }))
 handle('key:pasteAndSaveDbKey', () => ({ success: true, key: VALID_KEY }))
 handle('key:autoGetDbKey', () => ({ success: true, key: VALID_KEY, saved: false }))

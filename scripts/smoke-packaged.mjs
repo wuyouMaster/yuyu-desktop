@@ -1,5 +1,6 @@
 import { _electron as electron, expect } from '@playwright/test'
 import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, isAbsolute } from 'node:path'
 const executable = process.argv[2]
@@ -39,6 +40,8 @@ try {
   await expect(page.getByRole('button', { name: '暂不连接，进入主界面' })).toBeVisible()
   await page.getByRole('button', { name: '暂不连接，进入主界面' }).click()
   await expect(page.getByRole('heading', { name: '从一个数据源开始' })).toBeVisible()
+  // The disabled API must not require keychain access before the first window.
+  expect(existsSync(join(home, 'local-api-token.bin'))).toBe(false)
   const identity = await app.evaluate(({ app }) => ({
     packaged: app.isPackaged,
     path: app.getAppPath()

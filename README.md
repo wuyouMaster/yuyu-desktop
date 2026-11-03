@@ -28,7 +28,8 @@ corepack pnpm dev
 
 应用可在没有 runtime、没有账号时独立启动。初始引导允许直接进入主界面；数据源附近和
 设置中均可管理运行时。下载有真实字节进度、取消与重试，校验完成后须重启再配置数据源。
-`build/icon.png` 从受审查 SVG 生成，构建产物、测试截图和下载文件均被 Git 忽略。
+`build/icon.png` 从受审查 SVG 生成，构建产物、临时测试截图和下载文件均被 Git 忽略。
+本地 API 未启用时，Token 在打开 API 设置时按需创建；启用服务前仍必须完成安全存储和鉴权。
 
 当前微信默认公开目录为 macOS arm64 `0.1.0-dev.13`，包含新 Go host；钉钉和 Telegram
 仍使用各自的 `0.1.0-dev.2`，能力以实际界面和协议检查为准。旧包安装成功不代表新协议可用。
@@ -55,6 +56,7 @@ corepack pnpm test:unit
 corepack pnpm test:component
 corepack pnpm test:skill-install
 node --test tests/tooling/public-app-export.test.mjs
+node --test tests/tooling/macos-signing.test.cjs
 corepack pnpm test:e2e:build
 corepack pnpm exec playwright test
 corepack pnpm build:unpack
@@ -84,7 +86,8 @@ node scripts/smoke-install-flow.mjs <absolute-candidate.zip> <absolute-synthetic
 `smoke-install-flow` 使用隔离配置、真实安装器及 Electron preload，验证未安装、下载、重启、
 合成数据库连接与联系人。默认使用回环 HTTP；`--published` 使用固定清单中的公开 HTTPS 地址，
 不配置下载凭据。它不证明真实账号或 Windows 行为。
-macOS arm64 已进行本地验证；Windows 仅交叉编译，实测待安排。目录打包不是签名/公证发布。
+macOS arm64 已进行本地验证；Windows 仅交叉编译，实测待安排。macOS 打包会修复嵌套代码的
+本地 ad-hoc 签名并验证整个应用；这不是 Developer ID 签名或公证发布。
 没有自动推送、发布或 Actions。
 
 Telegram 候选包的 storage host 位于 `telegram/telegram-storage-host`。兼容检查和启动使用同一

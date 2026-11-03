@@ -2802,9 +2802,9 @@ app.whenReady().then(async () => {
 
   // 启动本地 HTTP API（由 settings.apiEnabled 控制）
   const settings = loadSettings()
-  // v2.1.8 and earlier did not have an API token. Generate it once during
-  // upgrade/startup without changing any existing API or database settings.
-  apiTokenStore.ensureToken()
+  // Starting the server obtains the token through secure storage. When the
+  // server is disabled, defer token creation until the API settings are opened
+  // so a system keychain prompt cannot block the first application window.
   if (settings.apiEnabled) {
     await apiServer.start(settings.apiHost, settings.apiPort)
   }

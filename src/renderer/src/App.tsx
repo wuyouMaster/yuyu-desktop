@@ -593,11 +593,18 @@ function App(): React.ReactElement {
   }, [dbRootInput])
 
   React.useEffect(() => {
+    if (!wechatSetupRequested) return
+    let active = true
     void window.api
       .getDatabaseKeyEnvironment()
-      .then(setDatabaseEnvironment)
+      .then((environment) => {
+        if (active) setDatabaseEnvironment(environment)
+      })
       .catch(() => undefined)
-  }, [])
+    return () => {
+      active = false
+    }
+  }, [wechatSetupRequested])
   React.useEffect(() => {
     const loadAIConfig = async (): Promise<void> => {
       try {

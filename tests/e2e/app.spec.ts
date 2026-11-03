@@ -33,6 +33,21 @@ test('APP-01 first launch renders a usable connection screen without uncaught er
   }
 })
 
+test('KEY-00 checks key storage only after the user opens WeChat setup', async () => {
+  const fixture = await launchTestApp({ mode: 'disconnected' })
+  const reads = () => fixture.app.evaluate(() =>
+    (globalThis as typeof globalThis & { syntheticKeyEnvironmentReads: number }).syntheticKeyEnvironmentReads
+  )
+  try {
+    await expect(fixture.page.getByRole('button', { name: '配置微信', exact: true })).toBeVisible()
+    expect(await reads()).toBe(0)
+    await fixture.page.getByRole('button', { name: '配置微信', exact: true }).click()
+    await expect.poll(reads).toBeGreaterThan(0)
+  } finally {
+    await fixture.close()
+  }
+})
+
 test('KEY-01 KEY-02 invalid key remains recoverable and valid key enters the app', async () => {
   const fixture = await launchTestApp({ mode: 'disconnected' })
   try {
