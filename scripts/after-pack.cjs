@@ -1,5 +1,6 @@
 const { existsSync } = require('node:fs')
 const path = require('node:path')
+const { signMacosBundle } = require('./sign-macos-bundle.cjs')
 const asar = require(
   require.resolve('@electron/asar', { paths: [require.resolve('electron-builder')] })
 )
@@ -51,5 +52,9 @@ module.exports = async function (context) {
   for (const file of required)
     if (!existsSync(path.join(unpacked, file)))
       throw new Error('Native package dependency missing: ' + file)
+  if (platform === 'darwin') {
+    signMacosBundle(path.join(context.appOutDir, context.packager.appInfo.productFilename + '.app'))
+    console.log('macOS app bundle ad-hoc signature verified')
+  }
   console.log('Application package verified: dependencies present; independent runtimes excluded')
 }
