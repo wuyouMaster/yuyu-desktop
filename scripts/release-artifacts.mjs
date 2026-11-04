@@ -13,7 +13,9 @@ const version = JSON.parse(readFileSync('package.json', 'utf8')).version
 if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/.test(version)) throw new Error('Invalid fixed version')
 const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 if (!/^[a-f0-9]{40}$/.test(sourceCommit)) throw new Error('Invalid source commit')
-const lockHash = createHash('sha256').update(readFileSync('runtime.lock.json')).digest('hex')
+// Hash the committed blob so Git's platform-specific checkout line endings do
+// not give the same source revision a different identity on Windows.
+const lockHash = createHash('sha256').update(execFileSync('git', ['show', `${sourceCommit}:runtime.lock.json`])).digest('hex')
 const prefix = `yuyu-desktop-${version}`
 const primary = target === 'mac-arm64' ? `${prefix}-arm64.zip` : `${prefix}-x64-setup.exe`
 const binaries = target === 'mac-arm64' ? [primary, `${prefix}-arm64.dmg`] : [primary]
@@ -47,6 +49,10 @@ if (action === 'prepare') {
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', { flag: 'wx' })
 } else {
   const actual = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  if (JSON.stringify(actual) !== JSON.stringify(manifest)) throw new Error('Release manifest mismatch')
+  for (const field of Object.keys(manifest))
+    if (JSON.stringify(actual[field]) !== JSON.stringify(manifest[field]))
+      throw new Error('Release manifest mismatch: ' + field)
+  if (Object.keys(actual).length !== Object.keys(manifest).length)
+    throw new Error('Release manifest contains unexpected fields')
 }
 console.log(JSON.stringify({ version, target, sourceCommit, assets: files.length, status: 'verified' }))
