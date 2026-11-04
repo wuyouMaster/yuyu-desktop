@@ -78,23 +78,24 @@
     },
     {
       "application": "telegram",
-      "version": "0.1.0-dev.2",
+      "version": "0.1.0-dev.3",
       "target": "darwin-arm64",
-      "sourceCommit": "4fbcbde8a433596e55ada3e154d2ae13d1b65d54",
+      "sourceCommit": "8523aa4e127ed1cd7e40700d23ad507c3932f5bf",
       "releaseStatus": "development-only",
       "githubAuthentication": false,
       "repository": "wuyouMaster/telegram-runtime-releases",
-      "tag": "v0.1.0-dev.2",
-      "asset": "telegram-runtime-0.1.0-dev.2-darwin-arm64.zip",
-      "url": "https://github.com/wuyouMaster/telegram-runtime-releases/releases/download/v0.1.0-dev.2/telegram-runtime-0.1.0-dev.2-darwin-arm64.zip",
-      "sha256": "905968c05f6317e2b70462903f048c2b7287e628eca928402e46def843769391",
-      "manifestSha256": "d10b35a681e67179dcf7b969027afba2d5a5211e01ac0b208b4d5c04feb70fdd",
+      "tag": "v0.1.0-dev.3",
+      "asset": "telegram-runtime-0.1.0-dev.3-darwin-arm64.zip",
+      "url": "https://github.com/wuyouMaster/telegram-runtime-releases/releases/download/v0.1.0-dev.3/telegram-runtime-0.1.0-dev.3-darwin-arm64.zip",
+      "sha256": "cbaa837cd9963bb5beeee02795b344ae9234d737c92103fc874e0a227396aece",
+      "manifestSha256": "0cad0f6d7f226a6305f026273fbc97f4bad81d7135c07c65bdce5f794a1ebb8f",
       "files": [
         "THIRD_PARTY_NOTICES.txt",
         "telegram/telegram-ax-history",
         "telegram/telegram-ax-send",
         "telegram/telegram-runtime-bridge",
-        "telegram/telegram-runtime-read"
+        "telegram/telegram-runtime-read",
+        "telegram/telegram-storage-host"
       ]
     }
   ]

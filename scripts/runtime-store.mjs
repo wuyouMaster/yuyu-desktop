@@ -6,6 +6,8 @@ import unzipper from 'unzipper'
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const MAX_ARCHIVE = 128 * 1024 * 1024
 const MAX_UNPACKED = 512 * 1024 * 1024
+const DOWNLOAD_IDLE_TIMEOUT_MS = 120_000
+const DOWNLOAD_MAX_DURATION_MS = 60 * 60 * 1000
 const safe = (name) =>
   typeof name === 'string' &&
   /^[a-zA-Z0-9_.\/-]+$/.test(name) &&
@@ -122,6 +124,7 @@ function validateManifest(manifest, item) {
 
 async function download(url, { token, allowLoopback = false, signal, onProgress } = {}) {
   let current = new URL(url)
+  const deadline = AbortSignal.timeout(DOWNLOAD_MAX_DURATION_MS)
   for (let n = 0; n < 5; n++) {
     const loopback = ['127.0.0.1', '[::1]'].includes(current.hostname)
     assert(
@@ -132,37 +135,52 @@ async function download(url, { token, allowLoopback = false, signal, onProgress 
     const headers = { Accept: 'application/octet-stream' }
     // Never forward a GitHub credential to release CDN redirects or arbitrary mirrors.
     if (token && current.hostname === 'api.github.com') headers.Authorization = `Bearer ${token}`
-    const response = await fetch(current, {
-      headers,
-      redirect: 'manual',
-      signal: AbortSignal.any([AbortSignal.timeout(120000), ...(signal ? [signal] : [])])
-    })
-    if ([301, 302, 303, 307, 308].includes(response.status)) {
-      const next = response.headers.get('location')
-      await response.body?.cancel()
-      assert(next, '下载重定向缺少地址')
-      current = new URL(next, current)
-      continue
+    const idle = new AbortController()
+    let timer
+    const resetIdle = () => {
+      clearTimeout(timer)
+      timer = setTimeout(
+        () => idle.abort(new DOMException('下载长时间没有进度', 'TimeoutError')),
+        DOWNLOAD_IDLE_TIMEOUT_MS
+      )
     }
-    assert(
-      response.ok,
-      response.status === 404
-        ? '下载文件不存在，或当前没有访问权限'
-        : `下载失败（HTTP ${response.status}）`
-    )
-    assert(Number(response.headers.get('content-length') || 0) <= MAX_ARCHIVE, '归档超过大小限制')
-    const total = Number(response.headers.get('content-length')) || undefined
-    onProgress?.({ phase: 'downloading', downloaded: 0, total })
-    const chunks = []
-    let size = 0
-    for await (const chunk of response.body) {
-      signal?.throwIfAborted()
-      size += chunk.length
-      onProgress?.({ phase: 'downloading', downloaded: size, total })
-      assert(size <= MAX_ARCHIVE, '归档超过大小限制')
-      chunks.push(chunk)
+    resetIdle()
+    try {
+      const response = await fetch(current, {
+        headers,
+        redirect: 'manual',
+        signal: AbortSignal.any([idle.signal, deadline, ...(signal ? [signal] : [])])
+      })
+      if ([301, 302, 303, 307, 308].includes(response.status)) {
+        const next = response.headers.get('location')
+        await response.body?.cancel()
+        assert(next, '下载重定向缺少地址')
+        current = new URL(next, current)
+        continue
+      }
+      assert(
+        response.ok,
+        response.status === 404
+          ? '下载文件不存在，或当前没有访问权限'
+          : `下载失败（HTTP ${response.status}）`
+      )
+      assert(Number(response.headers.get('content-length') || 0) <= MAX_ARCHIVE, '归档超过大小限制')
+      const total = Number(response.headers.get('content-length')) || undefined
+      onProgress?.({ phase: 'downloading', downloaded: 0, total })
+      const chunks = []
+      let size = 0
+      for await (const chunk of response.body) {
+        signal?.throwIfAborted()
+        resetIdle()
+        size += chunk.length
+        onProgress?.({ phase: 'downloading', downloaded: size, total })
+        assert(size <= MAX_ARCHIVE, '归档超过大小限制')
+        chunks.push(chunk)
+      }
+      return Buffer.concat(chunks)
+    } finally {
+      clearTimeout(timer)
     }
-    return Buffer.concat(chunks)
   }
   throw new Error('下载重定向次数过多')
 }

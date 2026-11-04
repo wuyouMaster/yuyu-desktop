@@ -28,12 +28,13 @@ corepack pnpm dev
 
 应用可在没有 runtime、没有账号时独立启动。初始引导允许直接进入主界面；数据源附近和
 设置中均可管理运行时。下载有真实字节进度、取消与重试，校验完成后须重启再配置数据源。
+下载在连续两分钟无进度或总耗时超过一小时时终止；持续传输的慢速连接可继续完成。
 `build/icon.png` 从受审查 SVG 生成，构建产物、临时测试截图和下载文件均被 Git 忽略。
 全新安装默认不启动本地 API，可在 API 页面手动开启；已有设置保持原来的开启状态。
 本地 API 未启用时，Token 在打开 API 设置时按需创建；启用服务前仍必须完成安全存储和鉴权。
 
-当前微信默认公开目录为 macOS arm64 `0.1.0-dev.13`，包含新 Go host；钉钉和 Telegram
-仍使用各自的 `0.1.0-dev.2`，能力以实际界面和协议检查为准。旧包安装成功不代表新协议可用。
+当前 macOS arm64 默认公开目录为微信 `0.1.0-dev.13`、钉钉 `0.1.0-dev.2` 和 Telegram
+`0.1.0-dev.3`，能力以实际界面和协议检查为准。旧包安装成功不代表新协议可用。
 开发验收可由主进程用 `YUYU_RUNTIME_TEST_CATALOG` 指定绝对路径的固定摘要目录，
 打包应用不接受该覆盖；Renderer 不能提供目录、命令或 host 路径。正式地址只能在新产物
 发布并核对匿名下载后更新。
@@ -86,14 +87,14 @@ node scripts/smoke-install-flow.mjs <absolute-candidate.zip> <absolute-synthetic
 `smoke-install-flow` 使用隔离配置、真实安装器及 Electron preload，验证未安装、下载、重启、
 合成数据库连接与联系人。默认使用回环 HTTP；`--published` 使用固定清单中的公开 HTTPS 地址，
 不配置下载凭据。它不证明真实账号或 Windows 行为。
-macOS arm64 已进行本地验证；Windows 仅交叉编译，实测待安排。macOS 打包会修复嵌套代码的
+macOS arm64 已进行本地验证；Windows x64 已完成云端打包和隔离配置启动检查，安装和升级
+仍待验证。macOS 打包会修复嵌套代码的
 本地 ad-hoc 签名并验证整个应用；这不是 Developer ID 签名或公证发布。
 本地验证不会自动推送、发布或触发 Actions。
 
-Telegram 候选包的 storage host 位于 `telegram/telegram-storage-host`。兼容检查和启动使用同一
-固定路径；已公开的 dev.2 不含该 host，仍会标记为不兼容。只有在后续候选发布并验证公开
-下载后才能更新默认目录。以上 Telegram 协议测试从候选 ZIP 安装并读取明确提供的合成数据，
-不会访问真实账号。
+Telegram `0.1.0-dev.3` 的 storage host 位于 `telegram/telegram-storage-host`，兼容检查和
+启动使用同一固定路径；旧 dev.2 不含该 host。Telegram 协议测试从公开 ZIP 安装并读取
+明确提供的合成数据，不会访问真实账号。
 
 ## 来源与交付
 
@@ -112,7 +113,7 @@ Telegram 候选包的 storage host 位于 `telegram/telegram-storage-host`。兼
 移走或改名。构建会检查包内容，验证更新元数据中的文件大小和 SHA-512，并生成包含源码提交、
 runtime 锁文件摘要及各产物 SHA-256 的清单。
 
-推送与 `package.json` 版本完全一致的标签（例如 `v0.0.0-migration.3`）后，
+推送与 `package.json` 版本完全一致的标签（例如 `v0.0.0-migration.4`）后，
 [发布工作流](.github/workflows/release-draft.yml) 在 macOS arm64 和 Windows x64 分别构建和
 执行检查；两边通过后才创建预发布 Release 草稿，并下载核对全部文件。草稿包含 macOS DMG、
 ZIP、Windows NSIS 安装程序、更新元数据、blockmap 和平台清单，不会自动公开发布。标签必须

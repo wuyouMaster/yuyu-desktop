@@ -97,10 +97,14 @@ try {
   const runtime = await page.evaluate(() => window.api.listRuntimeInstallations())
   expect(runtime.map((item) => item.application).sort()).toEqual(['dingtalk', 'telegram', 'wechat'])
   expect(runtime.some((r) => r.status === 'installed')).toBe(false)
-  if (process.platform === 'darwin' && process.arch === 'arm64')
+  if (process.platform === 'darwin' && process.arch === 'arm64') {
     expect(runtime.find((r) => r.application === 'wechat')).toMatchObject({
       version: '0.1.0-dev.13', status: 'not-installed'
     })
+    expect(runtime.find((r) => r.application === 'telegram')).toMatchObject({
+      version: '0.1.0-dev.3', status: 'not-installed'
+    })
+  }
   if (process.platform === 'win32' && process.arch === 'x64')
     expect(runtime.every((item) => item.status === 'unsupported')).toBe(true)
   if (fresh) {

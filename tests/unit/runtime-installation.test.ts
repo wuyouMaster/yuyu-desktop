@@ -187,6 +187,61 @@ describe('fixed runtime installation', () => {
       total: bytes.length
     })
   })
+  it('continues a long download while bytes keep arriving', async () => {
+    const { home, archive, item } = await fixture()
+    const bytes = await readFile(archive)
+    let startFetch!: () => void
+    const ready = new Promise<void>((resolve) => { startFetch = resolve })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      vi.stubGlobal('fetch', async (_url: URL, options: { signal: AbortSignal }) => {
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            const third = Math.floor(bytes.length / 3)
+            options.signal.addEventListener('abort', () => controller.error(options.signal.reason), { once: true })
+            controller.enqueue(bytes.subarray(0, third))
+            setTimeout(() => controller.enqueue(bytes.subarray(third, 2 * third)), 65_000)
+            setTimeout(() => { controller.enqueue(bytes.subarray(2 * third)); controller.close() }, 130_000)
+          }
+        })
+        startFetch()
+        return new Response(stream, { headers: { 'content-length': String(bytes.length) } })
+      })
+      const result = installRuntime({ home, item })
+      await ready
+      await vi.advanceTimersByTimeAsync(130_000)
+      await expect(result).resolves.toMatchObject({ sha256: item.sha256 })
+      await verifyRuntime(home, item)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+  it('aborts a download that stops making progress', async () => {
+    const { home, archive, item } = await fixture()
+    const bytes = await readFile(archive)
+    let startFetch!: () => void
+    const ready = new Promise<void>((resolve) => { startFetch = resolve })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      vi.stubGlobal('fetch', async (_url: URL, options: { signal: AbortSignal }) => {
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            options.signal.addEventListener('abort', () => controller.error(options.signal.reason), { once: true })
+            controller.enqueue(bytes.subarray(0, 1))
+          }
+        })
+        startFetch()
+        return new Response(stream)
+      })
+      const result = installRuntime({ home, item }).then(() => null, (error: Error) => error)
+      await ready
+      await vi.advanceTimersByTimeAsync(120_000)
+      expect(await result).toMatchObject({ name: 'TimeoutError', message: '下载长时间没有进度' })
+      expect(await readActive(home)).toEqual({})
+    } finally {
+      vi.useRealTimers()
+    }
+  })
   it('cancels a streamed download, preserves the active version and releases the install lock for retry', async () => {
     const { home, archive, item } = await fixture()
     await installRuntime({ home, archive, item })
