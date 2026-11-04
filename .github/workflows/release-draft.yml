@@ -1,0 +1,83 @@
+name: Build desktop release draft
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: mac-arm64
+            executable: dist/release-candidate/mac-arm64/语屿 YUYU.app/Contents/MacOS/语屿 YUYU
+          - runner: windows-2022
+            target: win-x64
+            executable: dist/release-candidate/win-unpacked/语屿 YUYU.exe
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: node scripts/check-release-tag.mjs
+      - run: corepack pnpm install --frozen-lockfile
+      - run: corepack pnpm exec playwright install chromium
+      - run: corepack pnpm typecheck
+      - run: corepack pnpm test:unit
+      - run: corepack pnpm test:component
+      - run: corepack pnpm test:skill-install
+      - run: node --test tests/tooling/public-app-export.test.mjs tests/tooling/macos-signing.test.cjs tests/tooling/release-artifacts.test.mjs
+      - run: corepack pnpm test:e2e:build
+      - run: corepack pnpm build:release:candidate
+      - name: Smoke test the packaged application
+        env:
+          RELEASE_EXECUTABLE: ${{ matrix.executable }}
+        run: node -e "const {spawnSync}=require('node:child_process'); const p=require('node:path'); const r=spawnSync(process.execPath,['scripts/smoke-packaged.mjs',p.resolve(process.env.RELEASE_EXECUTABLE),'--fresh','--release'],{stdio:'inherit'}); process.exit(r.status ?? 1)"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            dist/release-candidate/*.dmg
+            dist/release-candidate/*.zip
+            dist/release-candidate/*.exe
+            dist/release-candidate/*.blockmap
+            dist/release-candidate/latest*.yml
+            dist/release-candidate/release-manifest-*.json
+  draft:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: dist/release-upload
+      - name: Create and verify draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/create-release-draft.mjs

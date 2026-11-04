@@ -16,8 +16,10 @@ module.exports = async function (context) {
       : path.join(context.appOutDir, 'resources')
   if (!existsSync(path.join(resources, 'skill/yuyu-reader/SKILL.md')))
     throw new Error('Bundled Reader Skill missing')
+  if (!existsSync(path.join(resources, 'NOTICE.md')))
+    throw new Error('Bundled attribution notice missing')
   const archive = path.join(resources, 'app.asar'),
-    files = new Set(asar.listPackage(archive))
+    files = new Set(asar.listPackage(archive).map((entry) => entry.replaceAll('\\', '/')))
   for (const item of [
     'out/main/index.js',
     'out/main/runtimeRpcWorker.js',

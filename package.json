@@ -26,7 +26,7 @@
   "main": "./out/main/index.js",
   "scripts": {
     "typecheck": "pnpm typecheck:node && pnpm typecheck:web && pnpm typecheck:test",
-    "test": "vitest run && node --test tests/tooling/public-app-export.test.mjs tests/tooling/macos-signing.test.cjs",
+    "test": "vitest run && node --test tests/tooling/public-app-export.test.mjs tests/tooling/macos-signing.test.cjs tests/tooling/release-artifacts.test.mjs",
     "runtime:list": "node scripts/runtime-cli.mjs list",
     "runtime:install": "node scripts/runtime-cli.mjs install",
     "runtime:verify": "node scripts/runtime-cli.mjs verify",
@@ -42,6 +42,7 @@
     "test:integration": "vitest run --config vitest.runtime-protocol.config.ts",
     "test:e2e:build": "pnpm prepare:assets && node scripts/build-report-template-example.cjs && cross-env YUYU_E2E_BUILD=1 VITE_SCHEDULED_REPORT_DEBUG=true electron-vite build",
     "build:unpack": "pnpm build && node scripts/build-unpacked.mjs",
+    "build:release:candidate": "pnpm build && node scripts/build-release.mjs",
     "prepare:assets": "node scripts/prepare-app-icon.mjs",
     "test:skill-install": "node scripts/test-skill-install-instruction.cjs"
   },

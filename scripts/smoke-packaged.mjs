@@ -4,11 +4,14 @@ import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, isAbsolute } from 'node:path'
 const executable = process.argv[2]
-const fresh = process.argv[3] === '--fresh'
-const restrictedParent = process.argv[4] === '--restricted-parent'
+const flags = process.argv.slice(3)
+const fresh = flags.includes('--fresh')
+const restrictedParent = flags.includes('--restricted-parent')
+const release = flags.includes('--release')
 if (!executable || !isAbsolute(executable)) throw new Error('Absolute packaged executable required')
-if (process.argv[3] && !fresh) throw new Error('Expected --fresh or no additional argument')
-if (process.argv[4] && (!fresh || !restrictedParent)) throw new Error('Expected --restricted-parent after --fresh')
+if (flags.some((flag) => !['--fresh', '--restricted-parent', '--release'].includes(flag)) ||
+    new Set(flags).size !== flags.length || (restrictedParent && !fresh))
+  throw new Error('Invalid smoke-test flags')
 // macOS cannot nest Chromium's sandbox within the read-deny profile used by
 // this synthetic-account test. The outer profile remains the access boundary.
 const appArgs = restrictedParent ? ['--no-sandbox'] : []
@@ -81,14 +84,25 @@ try {
   expect(market.install).toMatchObject({ success: false, code: 'market_unavailable' })
   expect(await network.evaluate((state) => state.requests)).toBe(0)
   await network.dispose()
-  const update = await page.evaluate(() => window.api.checkAppUpdate())
-  expect(update).toMatchObject({ success: false, state: { status: 'unsupported' } })
+  if (release) {
+    const update = await page.evaluate(() => window.api.getAppUpdateState())
+    expect(update).toMatchObject({
+      delivery: process.platform === 'darwin' ? 'release-page' : 'automatic',
+      isSimulation: false
+    })
+  } else {
+    const update = await page.evaluate(() => window.api.checkAppUpdate())
+    expect(update).toMatchObject({ success: false, state: { status: 'unsupported' } })
+  }
   const runtime = await page.evaluate(() => window.api.listRuntimeInstallations())
+  expect(runtime.map((item) => item.application).sort()).toEqual(['dingtalk', 'telegram', 'wechat'])
   expect(runtime.some((r) => r.status === 'installed')).toBe(false)
-  expect(runtime.find((r) => r.application === 'wechat')).toMatchObject({
-    version: '0.1.0-dev.13',
-    status: 'not-installed'
-  })
+  if (process.platform === 'darwin' && process.arch === 'arm64')
+    expect(runtime.find((r) => r.application === 'wechat')).toMatchObject({
+      version: '0.1.0-dev.13', status: 'not-installed'
+    })
+  if (process.platform === 'win32' && process.arch === 'x64')
+    expect(runtime.every((item) => item.status === 'unsupported')).toBe(true)
   if (fresh) {
     await app.close()
     app = undefined
@@ -109,6 +123,7 @@ try {
       packaged: identity.packaged,
       freshProfile: fresh,
       restrictedParent,
+      release,
       archive: true,
       workspace: true,
       readerSkill: true,

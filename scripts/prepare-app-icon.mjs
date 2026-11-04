@@ -1,5 +1,6 @@
 import { chromium } from '@playwright/test'
 import { mkdir, readFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 const svg = await readFile(
   new URL('../src/renderer/src/assets/brand-icon.svg', import.meta.url),
   'utf8'
@@ -16,7 +17,7 @@ try {
     '<style>html,body{margin:0;background:transparent}svg{width:1024px;height:1024px;display:block}</style>' +
       svg
   )
-  await page.screenshot({ path: output.pathname, omitBackground: true })
+  await page.screenshot({ path: fileURLToPath(output), omitBackground: true })
 } finally {
   await browser.close()
 }

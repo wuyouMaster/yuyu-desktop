@@ -56,8 +56,7 @@ corepack pnpm typecheck
 corepack pnpm test:unit
 corepack pnpm test:component
 corepack pnpm test:skill-install
-node --test tests/tooling/public-app-export.test.mjs
-node --test tests/tooling/macos-signing.test.cjs
+node --test tests/tooling/public-app-export.test.mjs tests/tooling/macos-signing.test.cjs tests/tooling/release-artifacts.test.mjs
 corepack pnpm test:e2e:build
 corepack pnpm exec playwright test
 corepack pnpm build:unpack
@@ -89,7 +88,7 @@ node scripts/smoke-install-flow.mjs <absolute-candidate.zip> <absolute-synthetic
 不配置下载凭据。它不证明真实账号或 Windows 行为。
 macOS arm64 已进行本地验证；Windows 仅交叉编译，实测待安排。macOS 打包会修复嵌套代码的
 本地 ad-hoc 签名并验证整个应用；这不是 Developer ID 签名或公证发布。
-没有自动推送、发布或 Actions。
+本地验证不会自动推送、发布或触发 Actions。
 
 Telegram 候选包的 storage host 位于 `telegram/telegram-storage-host`。兼容检查和启动使用同一
 固定路径；已公开的 dev.2 不含该 host，仍会标记为不兼容。只有在后续候选发布并验证公开
@@ -108,6 +107,16 @@ Telegram 候选包的 storage host 位于 `telegram/telegram-storage-host`。兼
 仍各自从 `runtime.lock.json` 指定的地址下载。手动下载入口指向 Releases 列表，便于查看预发布。
 默认目录构建不配置更新源，检查更新会显示尚未配置。`electron-builder.release.yml` 是仅供
 公开应用使用的发布配置，指向该公开仓库并先生成草稿；未经明确授权不得上传或发布。
-候选可使用 `--publish never` 本地构建并检查目标产物及更新元数据。正式 macOS 自动更新仍需
+在干净、已提交的 macOS arm64 或 Windows x64 工作区，可运行
+`corepack pnpm build:release:candidate` 生成 `dist/release-candidate/`，不会上传；已有目录需先
+移走或改名。构建会检查包内容，验证更新元数据中的文件大小和 SHA-512，并生成包含源码提交、
+runtime 锁文件摘要及各产物 SHA-256 的清单。
+
+推送与 `package.json` 版本完全一致的标签（例如 `v0.0.0-migration.2`）后，
+[发布工作流](.github/workflows/release-draft.yml) 在 macOS arm64 和 Windows x64 分别构建和
+执行检查；两边通过后才创建预发布 Release 草稿，并下载核对全部文件。草稿包含 macOS DMG、
+ZIP、Windows NSIS 安装程序、更新元数据、blockmap 和平台清单，不会自动公开发布。标签必须
+指向包含此工作流的提交，且不可复用已有 Release。推送标签会触发 Actions，须事先按贡献规范
+取得本次推送授权。正式 macOS 自动更新仍需
 签名、公证、ZIP 和实际升级验证；Windows 需要 NSIS 安装包及目标平台更新验证。预发布与稳定
 渠道的版本策略、发布及真实升级结果须另行核验，不能把模拟事件或目录构建当成上线成功。

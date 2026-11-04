@@ -16,6 +16,8 @@ asarUnpack:
   - node_modules/@napi-rs/system-ocr/**
   - node_modules/@napi-rs/system-ocr-*/**
 extraResources:
+  - from: NOTICE.md
+    to: NOTICE.md
   - from: resources/skill
     to: skill
     filter: ['**/*.md']
