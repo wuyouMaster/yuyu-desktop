@@ -894,19 +894,17 @@ function App(): React.ReactElement {
         setDiscoveredAccounts(discovery.accounts)
         setSelectedAccountId(discovery.preselectedAccountId || '')
       }
-      const startupAccountRoot = discovery.success
+      const startupAccount = discovery.success
         ? discovery.accounts.find((account) => account.id === discovery.preselectedAccountId)
-            ?.accountRoot
         : undefined
+      const startupAccountRoot = startupAccount?.accountRoot
       const autoLoginEnabled = settingsResult.settings.autoLogin
       // 开发环境允许使用 VITE_DB_KEY；生产安装包只能读取目标电脑自己的 safeStorage。
       const envKey = getDevelopmentDatabaseKey()
-      // 生产环境以及未配置开发密钥时，读取上一次保存到 safeStorage 的密钥。
+      // 仅在发现已保存的密钥时访问 safeStorage。
       let savedKey = ''
-      if (!envKey) {
-        const result = startupAccountRoot
-          ? await window.api.getSavedDbKey(startupAccountRoot)
-          : { success: true, saved: false, encryptionAvailable: true }
+      if (!envKey && startupAccountRoot && startupAccount?.hasSavedDbKey) {
+        const result = await window.api.getSavedDbKey(startupAccountRoot)
         if (result.success && result.key) savedKey = result.key
       }
       const key = envKey || savedKey

@@ -54,7 +54,7 @@ async function discoverAccountsUnchecked(
         wxid: identity?.wxid || cached?.wxid || deriveAccountWxid(path.basename(accountRoot)),
         nickname: identity?.nickname || cached?.nickname,
         avatar: cached?.avatar || identity?.avatar,
-        hasSavedDbKey: (await keyStore.getStatus(accountRoot)).saved,
+        hasSavedDbKey: await keyStore.hasSavedKey(accountRoot),
         loginStatus: currentAccountRoot
           ? path.resolve(currentAccountRoot).toLowerCase() ===
             path.resolve(accountRoot).toLowerCase()

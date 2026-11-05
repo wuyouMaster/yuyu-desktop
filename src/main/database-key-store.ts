@@ -20,9 +20,13 @@ export class DatabaseKeyStore {
     return path.join(this.directoryPath, `${id}.bin`)
   }
 
+  async hasSavedKey(accountRoot: string): Promise<boolean> {
+    return Boolean(accountRoot) && (await fs.pathExists(this.filePath(accountRoot)))
+  }
+
   async getStatus(accountRoot: string): Promise<{ saved: boolean; encryptionAvailable: boolean }> {
     return {
-      saved: Boolean(accountRoot) && (await fs.pathExists(this.filePath(accountRoot))),
+      saved: await this.hasSavedKey(accountRoot),
       encryptionAvailable: safeStorage.isEncryptionAvailable()
     }
   }

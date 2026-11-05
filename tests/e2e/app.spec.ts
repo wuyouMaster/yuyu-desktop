@@ -33,6 +33,26 @@ test('APP-01 first launch renders a usable connection screen without uncaught er
   }
 })
 
+test('startup reads a saved database key only when discovery reports one', async () => {
+  const disconnected = await launchTestApp({ mode: 'disconnected' })
+  const reads = (app: typeof disconnected.app) => app.evaluate(() =>
+    (globalThis as typeof globalThis & { syntheticSavedKeyReads: number }).syntheticSavedKeyReads
+  )
+  try {
+    await expect(disconnected.page.getByRole('button', { name: '配置微信', exact: true })).toBeVisible()
+    expect(await reads(disconnected.app)).toBe(0)
+  } finally {
+    await disconnected.close()
+  }
+  const connected = await launchTestApp()
+  try {
+    await expect(connected.page.getByRole('navigation', { name: '一级导航' })).toBeVisible()
+    await expect.poll(() => reads(connected.app)).toBeGreaterThan(0)
+  } finally {
+    await connected.close()
+  }
+})
+
 test('KEY-00 checks key storage only after the user opens WeChat setup', async () => {
   const fixture = await launchTestApp({ mode: 'disconnected' })
   const reads = () => fixture.app.evaluate(() =>

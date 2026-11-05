@@ -694,12 +694,16 @@ handle('wechat-share:getConfig', () => ({
   configured: true,
   serviceUrl: 'https://share.example.test'
 }))
-handle('key:getSavedDbKey', () => ({
-  success: true,
-  key: savedKey || undefined,
-  saved: Boolean(savedKey),
-  encryptionAvailable: true
-}))
+globalThis.syntheticSavedKeyReads = 0
+handle('key:getSavedDbKey', () => {
+  globalThis.syntheticSavedKeyReads += 1
+  return {
+    success: true,
+    key: savedKey || undefined,
+    saved: Boolean(savedKey),
+    encryptionAvailable: true
+  }
+})
 handle('key:saveDbKey', (_accountRoot, key) => {
   savedKey = String(key || '')
   return { success: true, key: savedKey, saved: true, encryptionAvailable: true }
