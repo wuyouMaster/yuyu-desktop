@@ -1,6 +1,6 @@
 {
   "name": "yuyu-desktop",
-  "version": "0.0.0-migration.4",
+  "version": "0.0.0-migration.5",
   "packageManager": "pnpm@7.33.7",
   "description": "YUYU Electron application with separately installed application runtimes",
   "keywords": [

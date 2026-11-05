@@ -114,7 +114,7 @@ Telegram `0.1.0-dev.3` 的 storage host 位于 `telegram/telegram-storage-host`�
 移走或改名。构建会检查包内容，验证更新元数据中的文件大小和 SHA-512，并生成包含源码提交、
 runtime 锁文件摘要及各产物 SHA-256 的清单。
 
-推送与 `package.json` 版本完全一致的标签（例如 `v0.0.0-migration.4`）后，
+推送与 `package.json` 版本完全一致的标签（例如 `v0.0.0-migration.5`）后，
 [发布工作流](.github/workflows/release-draft.yml) 在 macOS arm64 和 Windows x64 分别构建和
 执行检查；两边通过后才创建预发布 Release 草稿，并下载核对全部文件。草稿包含 macOS DMG、
 ZIP、Windows NSIS 安装程序、更新元数据、blockmap 和平台清单，不会自动公开发布。标签必须
