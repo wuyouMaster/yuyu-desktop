@@ -1,16 +1,34 @@
 import hashlib
 import importlib.util
 import io
+import os
 from pathlib import Path
+import shutil
+import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
 
+sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location('prepare_public_ffmpeg', Path(__file__).with_name('prepare-public-ffmpeg.py'))
 builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
 
 class PublicFfmpegTests(unittest.TestCase):
+    def test_test_runner_does_not_write_import_cache(self):
+        if os.environ.get('YUYU_TEST_FFMPEG_CHILD') == '1':
+            return
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in ['test_prepare_public_ffmpeg.py', 'prepare-public-ffmpeg.py']:
+                shutil.copy2(Path(__file__).with_name(name), root/name)
+            env = {**os.environ, 'YUYU_TEST_FFMPEG_CHILD': '1', 'PYTHONPYCACHEPREFIX': str(root/'cache')}
+            env.pop('PYTHONDONTWRITEBYTECODE', None)
+            subprocess.run([sys.executable, str(root/'test_prepare_public_ffmpeg.py')],
+                           env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.assertEqual(list((root/'cache').rglob('prepare-public-ffmpeg.*.pyc')), [])
+
     def test_source_requires_exact_bytes_and_rejects_symlink(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
