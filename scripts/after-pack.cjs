@@ -1,6 +1,8 @@
-const { existsSync } = require('node:fs')
+const { copyFileSync, existsSync, mkdirSync } = require('node:fs')
+const { execFileSync } = require('node:child_process')
 const path = require('node:path')
 const { signMacosBundle } = require('./sign-macos-bundle.cjs')
+const { verifyFfmpegLicense } = require('./check-ffmpeg-license.cjs')
 const asar = require(
   require.resolve('@electron/asar', { paths: [require.resolve('electron-builder')] })
 )
@@ -54,6 +56,24 @@ module.exports = async function (context) {
   for (const file of required)
     if (!existsSync(path.join(unpacked, file)))
       throw new Error('Native package dependency missing: ' + file)
+  if (platform !== process.platform)
+    throw new Error('FFmpeg validation requires building on the target platform')
+  if (platform === 'darwin' && arch === 'arm64') {
+    const project = path.join(__dirname, '..')
+    const stage = path.join(project, '.tmp', 'public-ffmpeg')
+    execFileSync('python3', [path.join(project, 'scripts/prepare-public-ffmpeg.py'), 'verify'], {
+      cwd: project, stdio: 'inherit'
+    })
+    copyFileSync(path.join(stage, 'ffmpeg'), path.join(unpacked, required[0]))
+    copyFileSync(path.join(stage, 'FFMPEG-LICENSE.md'), path.join(unpacked, 'ffmpeg-static', 'ffmpeg.LICENSE'))
+    copyFileSync(path.join(stage, 'FFMPEG-README.md'), path.join(unpacked, 'ffmpeg-static', 'ffmpeg.README'))
+    const notice = path.join(resources, 'third-party', 'ffmpeg')
+    mkdirSync(notice, { recursive: true })
+    for (const name of ['ffmpeg-9.0.2.tar.xz', 'opus-1.5.2.tar.gz', 'COPYING.LGPLv2.1',
+      'OPUS-COPYING', 'FFMPEG-LICENSE.md', 'FFMPEG-README.md', 'build.py', 'build.json'])
+      copyFileSync(path.join(stage, name), path.join(notice, name))
+  }
+  verifyFfmpegLicense(path.join(unpacked, required[0]))
   if (platform === 'darwin') {
     signMacosBundle(path.join(context.appOutDir, context.packager.appInfo.productFilename + '.app'))
     console.log('macOS app bundle ad-hoc signature verified')

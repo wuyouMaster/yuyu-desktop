@@ -117,6 +117,14 @@ Release；预览版本可选择同一预览渠道或较新的稳定版本，alph
 移走或改名。构建会检查包内容，验证更新元数据中的文件大小和 SHA-512，并生成包含源码提交、
 runtime 锁文件摘要及各产物 SHA-256 的清单。
 
+macOS arm64 打包前运行 `python3 scripts/prepare-public-ffmpeg.py build --download`，从官方来源
+获取并验证固定摘要的 FFmpeg 9.0.2 与 Opus 1.5.2 源码，在本机构建不含 GPL/nonfree 组件的
+FFmpeg。也可提前将这两份源归档放入 `.tmp/public-ffmpeg-sources/` 后不加 `--download` 离线
+构建。打包会验证源码、构建记录、许可证文本和二进制配置，替换 `ffmpeg-static` 自带的 macOS
+可执行文件，并在安装包内保留源码、许可和构建脚本。对已准备的二进制运行
+`FFMPEG_BIN="$PWD/.tmp/public-ffmpeg/ffmpeg" corepack pnpm test:ffmpeg` 验证合成音频转换。
+Windows 的 FFmpeg 和第三方许可仍需单独核对；本项目依赖的其他包也各有许可要求。
+
 推送与 `package.json` 版本完全一致的标签（例如 `v0.0.0-migration.6`）后，
 [发布工作流](.github/workflows/release-draft.yml) 在 macOS arm64 和 Windows x64 分别构建和
 执行检查；两边通过后才创建预发布 Release 草稿，并下载核对全部文件。草稿包含 macOS DMG、
