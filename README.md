@@ -107,6 +107,9 @@ Telegram `0.1.0-dev.3` 的 storage host 位于 `telegram/telegram-storage-host`�
 
 主应用的发布说明和安装包使用 `wuyouMaster/yuyu-desktop` 的 Releases；三个 runtime
 仍各自从 `runtime.lock.json` 指定的地址下载。手动下载入口指向 Releases 列表，便于查看预发布。
+更新检查只选择公开的 Release，忽略尚未发布的草稿和只有标签的版本。稳定版本只选择稳定
+Release；预览版本可选择同一预览渠道或较新的稳定版本，alpha 也可选择 beta。Windows 更新使用完整安装包并
+保留更新元数据的摘要检查；公开版本列表不可访问时显示错误，不会回退到未核实的标签。
 默认目录构建不配置更新源，检查更新会显示尚未配置。`electron-builder.release.yml` 是仅供
 公开应用使用的发布配置，指向该公开仓库并先生成草稿；未经明确授权不得上传或发布。
 在干净、已提交的 macOS arm64 或 Windows x64 工作区，可运行

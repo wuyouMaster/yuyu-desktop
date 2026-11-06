@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => {
     updater: {
       autoDownload: true,
       autoInstallOnAppQuit: false,
+      disableDifferentialDownload: false,
+      setFeedURL: vi.fn(),
       checkForUpdates: vi.fn(),
       downloadUpdate: vi.fn(),
       quitAndInstall: vi.fn(),
@@ -20,6 +22,7 @@ const mocks = vi.hoisted(() => {
     shell: {
       openExternal: vi.fn()
     },
+    net: { fetch: vi.fn() },
     emit(event: string, ...args: unknown[]): void {
       for (const listener of listeners.get(event) || []) listener(...args)
     }
@@ -34,7 +37,8 @@ vi.mock('electron', () => ({
   BrowserWindow: {
     getAllWindows: () => []
   },
-  shell: mocks.shell
+  shell: mocks.shell,
+  net: mocks.net
 }))
 
 vi.mock('electron-updater', () => ({ autoUpdater: mocks.updater }))
@@ -47,6 +51,18 @@ describe('AppUpdateService', () => {
     vi.useRealTimers()
     vi.clearAllMocks()
     mocks.listeners.clear()
+    mocks.net.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          tag_name: 'v2.2.3',
+          draft: false,
+          prerelease: false,
+          published_at: '2026-11-05T00:00:00Z',
+          assets: [{ name: 'latest.yml' }, { name: 'latest-mac.yml' }]
+        }
+      ]
+    })
   })
 
   it('keeps update-not-available as the final state when checkForUpdates returns metadata', async () => {
@@ -57,8 +73,8 @@ describe('AppUpdateService', () => {
     })
     mocks.updater.checkForUpdates.mockImplementationOnce(async () => {
       mocks.emit('checking-for-update')
-      mocks.emit('update-not-available', { version: '1.9.0' })
-      return { updateInfo: { version: '1.9.0' } }
+      mocks.emit('update-not-available', { version: '2.2.3' })
+      return { updateInfo: { version: '2.2.3' } }
     })
 
     const result = await service.check('manual')
@@ -138,6 +154,10 @@ describe('AppUpdateService', () => {
       delivery: 'release-page',
       version: '2.2.3'
     })
+    expect(mocks.updater.setFeedURL).toHaveBeenCalledWith({
+      provider: 'generic',
+      url: 'https://github.com/wuyouMaster/yuyu-desktop/releases/download/v2.2.3/'
+    })
 
     const download = await service.download()
     expect(download.success).toBe(false)
@@ -182,9 +202,119 @@ describe('AppUpdateService', () => {
       percent: 100
     })
     expect(mocks.updater.downloadUpdate).toHaveBeenCalledOnce()
+    expect(mocks.updater.disableDifferentialDownload).toBe(true)
 
     expect(service.install()).toEqual({ success: true })
     expect(mocks.updater.quitAndInstall).toHaveBeenCalledOnce()
+  })
+
+  it('rejects mismatched update metadata and prevents downloading it', async () => {
+    const states: ReturnType<AppUpdateService['getState']>[] = []
+    const service = new AppUpdateService({
+      updateSourceAvailable: () => true,
+      platform: 'win32',
+      packagedRuntime: () => true,
+      currentVersion: () => '2.2.2'
+    })
+    service.handleState((state) => states.push(state))
+    mocks.updater.checkForUpdates.mockImplementationOnce(async () => {
+      mocks.emit('update-available', { version: '9.9.9' })
+      return { updateInfo: { version: '9.9.9' } }
+    })
+    expect(await service.check()).toMatchObject({ success: false, state: { status: 'error' } })
+    expect(states.some((state) => state.status === 'available')).toBe(false)
+    expect(await service.download()).toMatchObject({ success: false, state: { status: 'error' } })
+    expect(mocks.updater.downloadUpdate).not.toHaveBeenCalled()
+  })
+
+  it.each(['darwin', 'win32'] as const)(
+    'ignores a newer draft for %s without consulting the Atom feed',
+    async (platform) => {
+      mocks.net.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            tag_name: 'v0.0.0-migration.6',
+            draft: true,
+            prerelease: true,
+            published_at: '2026-11-05T00:00:00Z',
+            assets: []
+          },
+          {
+            tag_name: 'v0.0.0-migration.5',
+            draft: false,
+            prerelease: true,
+            published_at: '2026-11-05T00:00:00Z',
+            assets: []
+          }
+        ]
+      })
+      const service = new AppUpdateService({
+        updateSourceAvailable: () => true,
+        platform,
+        packagedRuntime: () => true,
+        currentVersion: () => '0.0.0-migration.5'
+      })
+      expect(await service.check()).toMatchObject({
+        success: true,
+        state: { status: 'up-to-date' }
+      })
+      expect(mocks.updater.checkForUpdates).not.toHaveBeenCalled()
+      expect(mocks.updater.setFeedURL).not.toHaveBeenCalled()
+    }
+  )
+
+  it('pins an older client to the published release when a newer draft exists', async () => {
+    mocks.net.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        {
+          tag_name: 'v0.0.0-migration.6',
+          draft: true,
+          prerelease: true,
+          published_at: null,
+          assets: []
+        },
+        {
+          tag_name: 'v0.0.0-migration.5',
+          draft: false,
+          prerelease: true,
+          published_at: '2026-11-05T00:00:00Z',
+          assets: [{ name: 'latest-mac.yml' }]
+        }
+      ]
+    })
+    const service = new AppUpdateService({
+      updateSourceAvailable: () => true,
+      platform: 'darwin',
+      packagedRuntime: () => true,
+      currentVersion: () => '0.0.0-migration.4'
+    })
+    mocks.updater.checkForUpdates.mockImplementationOnce(async () => {
+      mocks.emit('update-available', { version: '0.0.0-migration.5' })
+      return { updateInfo: { version: '0.0.0-migration.5' } }
+    })
+    expect(await service.check()).toMatchObject({
+      success: true,
+      state: { version: '0.0.0-migration.5' }
+    })
+    expect(mocks.updater.setFeedURL).toHaveBeenCalledWith({
+      provider: 'generic',
+      url: 'https://github.com/wuyouMaster/yuyu-desktop/releases/download/v0.0.0-migration.5/'
+    })
+  })
+
+  it('reports API failure without falling back to unchecked tags', async () => {
+    mocks.net.fetch.mockResolvedValueOnce({ ok: false, status: 403 })
+    const service = new AppUpdateService({
+      updateSourceAvailable: () => true,
+      platform: 'win32',
+      packagedRuntime: () => true,
+      currentVersion: () => '0.0.0-migration.5'
+    })
+    expect(await service.check()).toMatchObject({ success: false, state: { status: 'error' } })
+    expect(mocks.updater.checkForUpdates).not.toHaveBeenCalled()
+    expect(mocks.updater.setFeedURL).not.toHaveBeenCalled()
   })
 })
 

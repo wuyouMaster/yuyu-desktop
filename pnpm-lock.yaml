@@ -39,6 +39,7 @@ specifiers:
   "@types/qrcode": ^1.5.6
   "@types/react": ^19.2.7
   "@types/react-dom": ^19.2.3
+  "@types/semver": 7.7.1
   "@vitejs/plugin-react": ^5.1.1
   "@vitest/coverage-v8": ^4.1.10
   archiver: ^8.0.0
@@ -71,6 +72,7 @@ specifiers:
   react-is: ^19.3.0
   recharts: ^3.10.1
   sass: ^1.102.0
+  semver: 7.7.3
   sherpa-onnx-node: 1.13.3
   tailwind-merge: ^3.6.0
   tailwindcss: 3.4.17
@@ -118,6 +120,7 @@ dependencies:
   qrcode: 1.5.4
   react-is: 19.3.0
   recharts: 3.10.1_zjfgmdzqdcgz5rfrwqvqi7cn5u
+  semver: 7.7.3
   sherpa-onnx-node: 1.13.3
   tailwind-merge: 3.6.0
   unzipper: 0.12.5
@@ -139,6 +142,7 @@ devDependencies:
   "@types/qrcode": 1.5.6
   "@types/react": 19.2.7
   "@types/react-dom": 19.2.3_@types+react@19.2.7
+  "@types/semver": 7.7.1
   "@vitejs/plugin-react": 5.1.2_vite@7.2.7
   "@vitest/coverage-v8": 4.1.10_vitest@4.1.10
   autoprefixer: 10.5.4_postcss@8.5.26
@@ -3816,6 +3820,10 @@ packages:
       integrity: sha512-H/+L+UkTV33uf49PH5pCAUBVPNj2nDBXTN+qS1dOwyyg24l3CcicicCA7ca+HMvJBZcFgl5r8e+RR6elsb4Lyw==
     dependencies:
       "@types/node": 22.19.2
+    dev: true
+  /@types/semver/7.7.1:
+    resolution:
+      integrity: sha512-FmgJfu+MOcQ370SD0ev7EI8TlCAfKYU+B4m5T3yXc1CiRN94g/SZPtsCkk506aUDtlMnFZvasDwHHUcZUEaYuA==
     dev: true
   /@types/use-sync-external-store/0.0.6:
     resolution:

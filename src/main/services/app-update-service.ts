@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, BrowserWindow, shell } from 'electron'
 import { autoUpdater, type ProgressInfo } from 'electron-updater'
+import { compare } from 'semver'
 import type {
   AppUpdateCheckResult,
   AppUpdateCheckSource,
@@ -12,6 +13,7 @@ import type {
 } from '../../shared/app-update'
 import { APP_UPDATE_RELEASES_URL } from '../../shared/app-update'
 import { isPackagedRuntime } from '../runtime-mode'
+import { publishedReleaseFeedUrl, selectPublishedAppRelease } from './published-app-release'
 
 const SIMULATION_VERSION = '2.0.0'
 const SIMULATION_TOTAL_BYTES = 60 * 1024 * 1024
@@ -39,6 +41,7 @@ export class AppUpdateService {
   private readonly simulationEnabled: boolean
   private readonly simulationDurationMs: number
   private readonly delivery: AppUpdateDelivery
+  private readonly platform: NodeJS.Platform
   private readonly broadcast?: (state: AppUpdateState) => void
   private state: AppUpdateState
   private listeners = new Set<(state: AppUpdateState) => void>()
@@ -46,6 +49,8 @@ export class AppUpdateService {
   private startupCheckScheduled = false
   private checkInFlight?: Promise<AppUpdateCheckResult>
   private downloadInFlight?: Promise<AppUpdateCheckResult>
+  private verifiedUpdateVersion?: string
+  private pendingReleaseVersion?: string
 
   constructor(options: AppUpdateServiceOptions = {}) {
     this.currentVersion = options.currentVersion || (() => app.getVersion())
@@ -63,6 +68,7 @@ export class AppUpdateService {
       ? Math.max(1_000, configuredDuration)
       : DEFAULT_SIMULATION_DURATION_MS
     const platform = options.platform || process.platform
+    this.platform = platform
     const macAutoUpdateEnabled = options.macAutoUpdateEnabled ?? MAC_AUTO_UPDATE_ENABLED
     this.delivery =
       !this.simulationEnabled && platform === 'darwin' && !macAutoUpdateEnabled
@@ -91,7 +97,8 @@ export class AppUpdateService {
         error: undefined
       })
     )
-    autoUpdater.on('update-available', (info) =>
+    autoUpdater.on('update-available', (info) => {
+      if (!this.pendingReleaseVersion || info.version !== this.pendingReleaseVersion) return
       this.setState({
         status: 'available',
         source: this.activeCheckSource,
@@ -99,15 +106,16 @@ export class AppUpdateService {
         message: '发现新版本',
         error: undefined
       })
-    )
-    autoUpdater.on('update-not-available', () =>
+    })
+    autoUpdater.on('update-not-available', (info) => {
+      if (!this.pendingReleaseVersion || info.version !== this.pendingReleaseVersion) return
       this.setState({
         status: 'up-to-date',
         source: this.activeCheckSource,
         message: '已是最新版本',
         error: undefined
       })
-    )
+    })
     autoUpdater.on('download-progress', (progress: ProgressInfo) => {
       if (this.delivery !== 'automatic') return
       this.setState({
@@ -200,8 +208,35 @@ export class AppUpdateService {
       })
       return { success: false, state }
     }
+    this.verifiedUpdateVersion = undefined
+    this.setState({
+      status: 'checking',
+      source,
+      message: '正在检查更新',
+      version: undefined,
+      percent: undefined,
+      transferred: undefined,
+      total: undefined,
+      bytesPerSecond: undefined,
+      error: undefined
+    })
     try {
-      await autoUpdater.checkForUpdates()
+      const release = await selectPublishedAppRelease(this.currentVersion())
+      if (compare(release.version, this.currentVersion()) <= 0) {
+        const state = this.setState({ status: 'up-to-date', message: '已是最新版本' })
+        return { success: true, state }
+      }
+      const channelFile = this.platform === 'darwin' ? 'latest-mac.yml' : 'latest.yml'
+      if (!release.assets.includes(channelFile)) throw new Error(`公开版本缺少 ${channelFile}`)
+      // Pin the updater to an actual published release, never an Atom feed tag.
+      // Generic URLs do not resolve the previous release's blockmap; use the verified full installer.
+      autoUpdater.disableDifferentialDownload = true
+      autoUpdater.setFeedURL({ provider: 'generic', url: publishedReleaseFeedUrl(release.tag) })
+      this.pendingReleaseVersion = release.version
+      const result = await autoUpdater.checkForUpdates()
+      if (result?.updateInfo.version !== release.version)
+        throw new Error('更新元数据的版本与公开版本不一致')
+      if (this.state.status === 'available') this.verifiedUpdateVersion = release.version
       return { success: true, state: this.getState() }
     } catch (error) {
       const state = this.setState({
@@ -210,6 +245,8 @@ export class AppUpdateService {
         error: error instanceof Error ? error.message : String(error)
       })
       return { success: false, state }
+    } finally {
+      this.pendingReleaseVersion = undefined
     }
   }
 
@@ -242,6 +279,15 @@ export class AppUpdateService {
         message: '开发模式不能下载更新',
         error: undefined
       })
+      return { success: false, state }
+    }
+    if (this.checkInFlight) return { success: false, state: this.getState() }
+    if (
+      !this.verifiedUpdateVersion ||
+      this.state.status !== 'available' ||
+      this.state.version !== this.verifiedUpdateVersion
+    ) {
+      const state = this.setState({ status: 'error', message: '请先成功检查公开更新版本' })
       return { success: false, state }
     }
     try {
