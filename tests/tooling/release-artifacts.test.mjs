@@ -64,6 +64,19 @@ test('release tag must match both the package version and event commit', (t) => 
   assert.notEqual(run({ GITHUB_SHA: '0'.repeat(40) }).status, 0)
 })
 
+test('development-preview workflow rejects a matching stable tag', (t) => {
+  const f = fixture(t, 'mac-arm64')
+  writeFileSync(join(f.root, 'package.json'), JSON.stringify({ version: '1.0.0' }))
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: f.root, encoding: 'utf8' }).trim()
+  const result = spawnSync(process.execPath, [tagChecker], {
+    cwd: f.root,
+    env: { ...process.env, GITHUB_REF_TYPE: 'tag', GITHUB_REF_NAME: 'v1.0.0', GITHUB_SHA: head },
+    encoding: 'utf8'
+  })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /Stable tags cannot use the development-preview release workflow/)
+})
+
 test('runtime lock source hash is stable across LF and CRLF checkouts', (t) => {
   const f = fixture(t, 'win-x64')
   const lock = join(f.root, 'runtime.lock.json')

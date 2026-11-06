@@ -6,6 +6,10 @@ const tag = process.env.GITHUB_REF_NAME || ''
 if (process.env.GITHUB_REF_TYPE !== 'tag' || tag !== `v${version}` ||
     !/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/.test(tag))
   throw new Error('Release tag must exactly match the checked-out package version')
+// This workflow produces unsigned development previews and always creates a
+// prerelease. A stable tag requires a separately validated release process.
+if (!version.includes('-'))
+  throw new Error('Stable tags cannot use the development-preview release workflow')
 const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 if (!/^[a-f0-9]{40}$/.test(head) || head !== process.env.GITHUB_SHA)
   throw new Error('Release checkout does not match the tag event commit')
