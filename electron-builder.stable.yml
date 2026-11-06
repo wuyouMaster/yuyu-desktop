@@ -1,0 +1,8 @@
+# Candidate configuration for the public macOS arm64 stable release only.
+extends: ./electron-builder.release.yml
+forceCodeSigning: true
+mac:
+  identity: ''
+  type: distribution
+  hardenedRuntime: true
+  notarize: true
