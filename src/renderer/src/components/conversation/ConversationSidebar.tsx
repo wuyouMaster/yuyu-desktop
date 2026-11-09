@@ -26,6 +26,8 @@ export interface ConversationSidebarProps {
   onRefresh: (filterKeyword: string) => Promise<void>
   /** Some sources contain mostly direct conversations and should show them immediately. */
   expandContactsByDefault?: boolean
+  /** Sources without reliable conversation types use a neutral single section. */
+  unclassifiedConversations?: boolean
 }
 
 type SectionName = 'groups' | 'folded' | 'officialAccounts' | 'contacts'
@@ -44,7 +46,8 @@ export function ConversationSidebar({
   dbConnecting = false,
   onOpenSettings,
   onRefresh,
-  expandContactsByDefault = false
+  expandContactsByDefault = false,
+  unclassifiedConversations = false
 }: ConversationSidebarProps): React.ReactElement {
   const [searchTerm, setSearchTerm] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -69,7 +72,7 @@ export function ConversationSidebar({
       !contact.isOfficialAccount &&
       !contact.m_nsUsrName.startsWith('gh_')
   )
-  const rows = useMemo<ConversationRow[]>(
+  const categorizedRows = useMemo<ConversationRow[]>(
     () => [
       {
         kind: 'header',
@@ -143,6 +146,24 @@ export function ConversationSidebar({
       users
     ]
   )
+  const rows: ConversationRow[] = unclassifiedConversations
+    ? [
+        {
+          kind: 'header',
+          id: 'conversations-header',
+          title: '会话',
+          count: contacts.length,
+          section: 'contacts'
+        },
+        ...(expandedSections.contacts
+          ? contacts.map((contact) => ({
+              kind: 'contact' as const,
+              id: `conversation-${contact.md5}`,
+              contact
+            }))
+          : [])
+      ]
+    : categorizedRows
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => listRef.current,

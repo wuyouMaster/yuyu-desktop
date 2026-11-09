@@ -6,6 +6,7 @@ import type {
 import type { ReadContext } from '../shared/source-context'
 import type { DingtalkLocalInspection } from '../shared/dingtalk-local'
 import type { TelegramLocalInspection } from '../shared/telegram-local'
+import type { TelegramMacOSInspection, TelegramMacOSConnection } from '../shared/telegram-macos'
 import type {
   TelegramHistoryRequest,
   TelegramHistoryResult,
@@ -364,6 +365,8 @@ declare global {
       ) => Promise<Message[]>
       inspectDingtalkLocalSource: () => Promise<DingtalkLocalInspection>
       inspectTelegramLocalSource: () => Promise<TelegramLocalInspection>
+      inspectTelegramMacOSSource: () => Promise<TelegramMacOSInspection>
+      connectTelegramMacOSSource: (candidateId: string) => Promise<TelegramMacOSConnection>
       loadTelegramMedia: (request: TelegramMediaLoadRequest) => Promise<UnifiedAsset>
       loadTelegramHistory: (request: TelegramHistoryRequest) => Promise<TelegramHistoryResult>
       startTelegramHistoryQueue: (

@@ -46,7 +46,7 @@ export interface Participant extends SourceEntityFields {
   aliases?: string[]
 }
 
-export type ConversationKind = 'direct' | 'group' | 'channel'
+export type ConversationKind = 'direct' | 'group' | 'channel' | 'unknown'
 
 export interface Conversation extends SourceEntityFields {
   kind: 'conversation'

@@ -40,6 +40,19 @@ corepack pnpm dev
 打包应用不接受该覆盖；Renderer 不能提供目录、命令或 host 路径。正式地址只能在新产物
 发布并核对匿名下载后更新。
 
+## 原生 Telegram for macOS
+
+数据源入口区分 Telegram（macOS 原生版）和 Telegram Desktop。原生版通过运行时
+`client.inspect`、`macos.conversations` 和 `macos.messages` 只读浏览本地会话及消息，
+主进程固定客户端及数据目录，界面仅提交不透明候选标识。按需分页，可显示已识别的
+附件类型、文件名、尺寸及时长等元数据；不支持附件播放、下载、
+发送或补载云端历史。未知会话类型和昵称不作推断。切换或断开数据源会关闭自有读取进程。
+
+当前公开目录中的 Telegram dev.3 不包含这些原生接口，应用会明确提示更新运行时。
+新接口须与另行验证发布的运行时配套使用；本地候选验证不会自动修改公开下载目录。
+运行时目前仅验收原生 Telegram 13.2.0 / build 283467 的 macOS arm64 小样本；完整历史、
+其他客户端版本和媒体内容仍未验收。原 Telegram Desktop 接口继续独立保留。
+
 ## 接口边界
 
 - 安装器校验归档与 manifest 摘要、应用、平台、文件清单和每个文件；不继承 GitHub 凭据。

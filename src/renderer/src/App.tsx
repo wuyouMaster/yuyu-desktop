@@ -11,7 +11,8 @@ import { SourceScopeContext } from './features/data-sources/source-context'
 import { dingtalkSourceOption } from './features/data-sources/dingtalk-source-options'
 import {
   telegramLocalSourceOption,
-  telegramSourceOption
+  telegramSourceOption,
+  type TelegramLocalConnection
 } from './features/data-sources/telegram-source-options'
 import { wechatSourceOption } from './features/data-sources/wechat-source-options'
 import { DingtalkReadWorkspace } from './features/dingtalk/DingtalkReadWorkspace'
@@ -264,7 +265,7 @@ function App(): React.ReactElement {
   const [telegramSnapshot, setTelegramSnapshot] = useState<ProviderSnapshot>()
   const [telegramAccountLabel, setTelegramAccountLabel] = useState('')
   const [telegramExportPath, setTelegramExportPath] = useState('')
-  const [telegramLocalAccount, setTelegramLocalAccount] = useState<{ slot: number; id: string }>()
+  const [telegramLocalAccount, setTelegramLocalAccount] = useState<TelegramLocalConnection>()
   const [isDatabaseConnected, setIsDatabaseConnected] = useState(false)
   const [isDatabaseConnecting, setIsDatabaseConnecting] = useState(false)
   const [dbKey, setDbKey] = useState(getDevelopmentDatabaseKey)
@@ -373,7 +374,8 @@ function App(): React.ReactElement {
     telegramSnapshot,
     telegramAccountLabel,
     switchingSource,
-    Boolean(telegramLocalAccount)
+    Boolean(telegramLocalAccount),
+    telegramLocalAccount?.clientType
   )
   const telegramOptions = [
     telegramLocalSourceOption,
@@ -1563,7 +1565,7 @@ function App(): React.ReactElement {
 
   const handleImportTelegram = async (
     filePath?: string,
-    local?: { slot: number; id: string }
+    local?: TelegramLocalConnection
   ): Promise<void> => {
     if (sourceSwitchRef.current) return
     if (reportGeneration.isGenerating || isSavingGeneratedReport) {
@@ -1588,7 +1590,9 @@ function App(): React.ReactElement {
         disconnected = true
       }
       const imported = local
-        ? await window.api.connectTelegramLocalSource(local.slot, local.id)
+        ? local.clientType === 'telegram-macos'
+          ? await window.api.connectTelegramMacOSSource(local.candidateId)
+          : await window.api.connectTelegramLocalSource(local.slot, local.id)
         : await window.api.importTelegramSource(selectedPath!)
       const snapshot = await window.api.getUnifiedProviderSnapshot()
       if (!snapshot || snapshot.source !== 'telegram')
@@ -1624,7 +1628,11 @@ function App(): React.ReactElement {
       setIsConversationAIOpen(false)
       setLatestGeneratedReportId(null)
       setReportNotice(
-        (local ? '已读取 Telegram 本地快照：' : '已导入 Telegram Desktop JSON：') +
+        (local?.clientType === 'telegram-macos'
+          ? '已连接 Telegram macOS 原生版，只读加载首批会话：'
+          : local
+            ? '已读取 Telegram 本地快照：'
+            : '已导入 Telegram Desktop JSON：') +
           imported.conversationCount +
           ' 个会话'
       )
@@ -1660,10 +1668,14 @@ function App(): React.ReactElement {
     if (!telegramLocalAccount || activeSourceKind !== 'telegram' || sourceSwitchRef.current) return
     sourceSwitchRef.current = true
     try {
-      await window.api.connectTelegramLocalSource(
-        telegramLocalAccount.slot,
-        telegramLocalAccount.id
-      )
+      if (telegramLocalAccount.clientType === 'telegram-macos') {
+        await window.api.connectTelegramMacOSSource(telegramLocalAccount.candidateId)
+      } else {
+        await window.api.connectTelegramLocalSource(
+          telegramLocalAccount.slot,
+          telegramLocalAccount.id
+        )
+      }
       const snapshot = await window.api.getUnifiedProviderSnapshot()
       if (!snapshot || snapshot.source !== 'telegram')
         throw new Error('Telegram 数据源连接状态无效')
@@ -2567,6 +2579,7 @@ function App(): React.ReactElement {
         <TelegramReadWorkspace
           key={telegramSnapshot?.accountId}
           snapshot={telegramSnapshot}
+          localClientType={telegramLocalAccount?.clientType}
           onRefreshLocal={telegramLocalAccount ? handleRefreshTelegramLocal : undefined}
         />
       )
@@ -2781,7 +2794,12 @@ function App(): React.ReactElement {
           }}
           onConnectDingtalk={() => void handleConnectDingtalk()}
           onImportTelegram={() => void handleImportTelegram()}
-          onConnectTelegramLocal={(slot, id) => handleImportTelegram(undefined, { slot, id })}
+          onConnectTelegramLocal={(slot, id) =>
+            handleImportTelegram(undefined, { clientType: 'telegram-desktop', slot, id })
+          }
+          onConnectTelegramMacOS={(candidateId) =>
+            handleImportTelegram(undefined, { clientType: 'telegram-macos', candidateId })
+          }
         />
         <DatabaseConnectionPage
           showWechatSetup={wechatSetupRequested}
@@ -2956,7 +2974,12 @@ function App(): React.ReactElement {
           }}
           onConnectDingtalk={() => void handleConnectDingtalk()}
           onImportTelegram={() => void handleImportTelegram()}
-          onConnectTelegramLocal={(slot, id) => handleImportTelegram(undefined, { slot, id })}
+          onConnectTelegramLocal={(slot, id) =>
+            handleImportTelegram(undefined, { clientType: 'telegram-desktop', slot, id })
+          }
+          onConnectTelegramMacOS={(candidateId) =>
+            handleImportTelegram(undefined, { clientType: 'telegram-macos', candidateId })
+          }
         />
         <AppUpdatePrompt onDownloadStart={openUpdateSettings} onNotice={setReportNotice} />
         {showFirstUseWelcome && (

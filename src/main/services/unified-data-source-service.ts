@@ -70,6 +70,9 @@ import {
 import { TelegramMediaCache } from './telegram-storage-runtime'
 import { TelegramMediaLoadService } from './telegram-media-load-service'
 import { TelegramMediaDownloadService } from './telegram-media-download-service'
+import { TelegramMacOSService, telegramMacOSError } from './telegram-macos-service'
+import { TelegramMacOSReadProvider } from './telegram-macos-read-provider'
+import type { TelegramMacOSConnection, TelegramMacOSInspection } from '../../shared/telegram-macos'
 import type { WechatAssetProviderResolver } from './wechat-asset-resolver'
 import * as chat from './chat-service'
 import { personalWechatSendService } from './personal-wechat-send-service'
@@ -97,6 +100,8 @@ export class UnifiedDataSourceService {
   private telegramHistoryQueue: TelegramHistoryQueue | undefined
   private telegramRuntimeSlot: number | undefined
   private telegramMediaCache: TelegramMediaCache | undefined
+  private telegramMacOSProvider: TelegramMacOSReadProvider | undefined
+  private readonly pendingTelegramMacOSProviders = new Set<TelegramMacOSReadProvider>()
   private readonly mediaCleanupTasks = new Set<Promise<void>>()
   private readonly telegramMediaTokens = new Map<
     string,
@@ -117,7 +122,8 @@ export class UnifiedDataSourceService {
       attempts: 60,
       timeoutMs: 90000
     }),
-    private readonly telegramMediaDownload = new TelegramMediaDownloadService()
+    private readonly telegramMediaDownload = new TelegramMediaDownloadService(),
+    private readonly telegramMacOS = new TelegramMacOSService()
   ) {
     this.sender = sender
     this.dingtalkSender = dingtalkSender
@@ -141,6 +147,7 @@ export class UnifiedDataSourceService {
     validateRegistration(registration)
     this.clear()
     this.registry.register(registration)
+    if (read instanceof TelegramMacOSReadProvider) this.telegramMacOSProvider = read
     this.selectedSource = read.source
     this.currentAccountId = read.accountId
   }
@@ -212,6 +219,41 @@ export class UnifiedDataSourceService {
     this.currentAccountId = provider.accountId
     this.currentDingtalkAccountKey = account.accountKey
     return Boolean(provider)
+  }
+
+  inspectTelegramMacOSSource(): Promise<TelegramMacOSInspection> {
+    this.assertOpen()
+    return this.telegramMacOS.inspect()
+  }
+
+  async connectTelegramMacOSSource(candidateId: string): Promise<TelegramMacOSConnection> {
+    this.assertOpen()
+    const session = this.contextSession
+    const provider = this.telegramMacOS.createProvider(candidateId)
+    this.pendingTelegramMacOSProviders.add(provider)
+    try {
+      const initial = await provider.listConversations({ limit: 50 })
+      this.assertOpen()
+      if (session !== this.contextSession)
+        throw new Error('数据源已切换，请重新连接 Telegram macOS。')
+      this.pendingTelegramMacOSProviders.delete(provider)
+      this.clear()
+      this.telegramMacOSProvider = provider
+      this.registry.register({ read: provider })
+      this.selectedSource = provider.source
+      this.currentAccountId = provider.accountId
+      return {
+        accountId: provider.accountId,
+        accountLabel: provider.accountLabel,
+        conversationCount: initial.items.length,
+        messageCount: 0
+      }
+    } catch (error) {
+      await provider.dispose()
+      throw telegramMacOSError(error)
+    } finally {
+      this.pendingTelegramMacOSProviders.delete(provider)
+    }
   }
 
   async connectTelegramLocalSource(
@@ -903,6 +945,18 @@ export class UnifiedDataSourceService {
   }
 
   clear(): void {
+    const inspectionCleanup = this.telegramMacOS.cancelInspection().catch(() => undefined)
+    this.runtimeCleanupTasks.add(inspectionCleanup)
+    void inspectionCleanup.finally(() => this.runtimeCleanupTasks.delete(inspectionCleanup))
+    const nativeProviders = new Set(this.pendingTelegramMacOSProviders)
+    if (this.telegramMacOSProvider) nativeProviders.add(this.telegramMacOSProvider)
+    this.pendingTelegramMacOSProviders.clear()
+    this.telegramMacOSProvider = undefined
+    for (const provider of nativeProviders) {
+      const cleanup = provider.dispose().catch(() => undefined)
+      this.runtimeCleanupTasks.add(cleanup)
+      void cleanup.finally(() => this.runtimeCleanupTasks.delete(cleanup))
+    }
     this.telegramHistoryQueue?.cancel('source_changed')
     this.telegramHistoryQueue = undefined
     const owner = this.telegramOperationOwner

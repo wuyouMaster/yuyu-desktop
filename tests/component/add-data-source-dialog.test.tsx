@@ -73,6 +73,7 @@ describe('AddDataSourceDialog', () => {
       />
     )
     expect(screen.getByText('本地客户端 · JSON 导入')).toBeVisible()
+    await userEvent.click(screen.getByRole('button', { name: 'Telegram Desktop' }))
     expect(screen.getByText(/需运行本机 Telegram Desktop/)).toHaveTextContent(
       '补载会操作客户端打开会话并滚动'
     )

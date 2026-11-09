@@ -1581,6 +1581,14 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('source:inspectDingtalkLocal', () => dingtalkLocalService.inspect())
   ipcMain.handle('source:inspectTelegramLocal', () => telegramLocalService.inspect())
+  ipcMain.handle('source:inspectTelegramMacOS', () =>
+    unifiedDataSourceService.inspectTelegramMacOSSource()
+  )
+  ipcMain.handle('source:connectTelegramMacOS', (_, candidateId: unknown) => {
+    if (typeof candidateId !== 'string' || !/^telegram-macos-local:[a-f0-9]{24}$/.test(candidateId))
+      throw new Error('Telegram macOS 本地账号参数无效')
+    return unifiedDataSourceService.connectTelegramMacOSSource(candidateId)
+  })
   ipcMain.handle('source:loadTelegramHistory', (_, request) =>
     unifiedDataSourceService.loadTelegramHistory(request)
   )

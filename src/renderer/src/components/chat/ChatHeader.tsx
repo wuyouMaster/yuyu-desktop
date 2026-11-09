@@ -25,6 +25,7 @@ interface ChatHeaderProps {
   showConversationAI?: boolean
   showReportAction?: boolean
   statusLabel?: string
+  conversationTypeLabel?: string
 }
 
 export function ChatHeader({
@@ -45,13 +46,14 @@ export function ChatHeader({
   sendLabel: requestedSendLabel,
   showConversationAI = true,
   showReportAction = true,
-  statusLabel
+  statusLabel,
+  conversationTypeLabel
 }: ChatHeaderProps): React.ReactElement {
   const scope = useSourceScope()
   const sendLabel = requestedSendLabel || (scope ? `${scope.active.sourceLabel}发送` : '发送消息')
   const [searchOpen, setSearchOpen] = useState(Boolean(contentFilter))
   const displayName = contact.m_nsNickName || contact.m_nsUsrName || '未命名会话'
-  const typeLabel = isGroupChat ? '群聊' : '联系人'
+  const typeLabel = conversationTypeLabel || (isGroupChat ? '群聊' : '联系人')
   const visibleCount = contentFilter ? filteredCount : loadedCount
 
   const handleCloseSearch = (): void => {

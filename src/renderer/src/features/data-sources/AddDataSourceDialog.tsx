@@ -28,7 +28,8 @@ export function AddDataSourceDialog({
   onAddWechat,
   onConnectDingtalk,
   onImportTelegram,
-  onConnectTelegramLocal
+  onConnectTelegramLocal,
+  onConnectTelegramMacOS
 }: {
   application?: 'wechat' | 'dingtalk' | 'telegram'
   open: boolean
@@ -37,6 +38,7 @@ export function AddDataSourceDialog({
   onConnectDingtalk: () => void
   onImportTelegram: () => void
   onConnectTelegramLocal?: (slot: number, account: string) => Promise<void>
+  onConnectTelegramMacOS?: (candidateId: string) => Promise<void>
 }): React.ReactElement {
   const [inspection, setInspection] = useState<DingtalkLocalInspection>()
   const [checking, setChecking] = useState(false)
@@ -155,7 +157,10 @@ export function AddDataSourceDialog({
               <h3 className="font-semibold">Telegram</h3>
               <span className="text-xs text-muted-foreground">本地客户端 · JSON 导入</span>
             </div>
-            <TelegramLocalSourceCard onConnect={onConnectTelegramLocal} />
+            <TelegramLocalSourceCard
+              onConnect={onConnectTelegramLocal}
+              onConnectMacOS={onConnectTelegramMacOS}
+            />
             <p className="text-sm text-muted-foreground">
               导入 Telegram Desktop JSON 导出文件，浏览私聊、群组、频道和消息。发送通过正在运行的
               Telegram Desktop 完成，目前只支持文字，并需要 macOS Accessibility

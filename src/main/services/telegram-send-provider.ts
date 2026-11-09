@@ -77,6 +77,9 @@ export class TelegramSendProvider implements SendProvider {
     if (conversation.kind === 'channel') {
       return { accepted: false, error: 'Telegram 频道不支持从这里发送消息' }
     }
+    if (conversation.kind === 'unknown') {
+      return { accepted: false, error: 'Telegram 会话类型尚未确认，不能发送消息' }
+    }
     const extensions = conversation.extensions?.telegram
     const telegram =
       extensions && typeof extensions === 'object' ? (extensions as Record<string, unknown>) : {}

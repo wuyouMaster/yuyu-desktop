@@ -8,7 +8,11 @@ import { pendingSourceSetup, type SetupApplication } from './workspace-entry'
 const sources: { id: SetupApplication; name: string; description: string }[] = [
   { id: 'wechat', name: '微信', description: '连接本地微信数据库，浏览会话与聊天记录。' },
   { id: 'dingtalk', name: '钉钉', description: '检测本机钉钉账号，验证后连接只读数据。' },
-  { id: 'telegram', name: 'Telegram', description: '连接本机客户端，或直接导入 JSON 导出文件。' }
+  {
+    id: 'telegram',
+    name: 'Telegram',
+    description: '选择 macOS 原生 Telegram 或 Desktop，也可导入 JSON 导出文件。'
+  }
 ]
 export function SourceSetupWorkspace({
   onConnect,

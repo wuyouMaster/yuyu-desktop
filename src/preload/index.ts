@@ -6,6 +6,7 @@ import type {
 import type { ReadContext } from '../shared/source-context'
 import type { DingtalkLocalInspection } from '../shared/dingtalk-local'
 import type { TelegramLocalInspection } from '../shared/telegram-local'
+import type { TelegramMacOSInspection, TelegramMacOSConnection } from '../shared/telegram-macos'
 import type {
   TelegramHistoryRequest,
   TelegramHistoryResult,
@@ -206,6 +207,10 @@ const api = {
     ipcRenderer.invoke('source:inspectDingtalkLocal'),
   inspectTelegramLocalSource: (): Promise<TelegramLocalInspection> =>
     ipcRenderer.invoke('source:inspectTelegramLocal'),
+  inspectTelegramMacOSSource: (): Promise<TelegramMacOSInspection> =>
+    ipcRenderer.invoke('source:inspectTelegramMacOS'),
+  connectTelegramMacOSSource: (candidateId: string): Promise<TelegramMacOSConnection> =>
+    ipcRenderer.invoke('source:connectTelegramMacOS', candidateId),
   connectTelegramLocalSource: (slot: number, account: string) =>
     ipcRenderer.invoke('source:connectTelegramLocal', slot, account),
   loadTelegramMedia: (request: TelegramMediaLoadRequest): Promise<Asset> =>

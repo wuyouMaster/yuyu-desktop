@@ -27,6 +27,8 @@ type Props = Pick<
   messages: TelegramDisplayMessage[]
   context?: ReadContext
   historyControls?: ReactNode
+  showSendAction?: boolean
+  showSenderNames?: boolean
 }
 
 export function TelegramChatWindow({
@@ -42,7 +44,9 @@ export function TelegramChatWindow({
   onOpenSend,
   sendDialog,
   statusLabel,
-  historyControls
+  historyControls,
+  showSendAction = true,
+  showSenderNames = false
 }: Props): React.ReactElement {
   const listRef = useRef<HTMLDivElement>(null)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
@@ -99,19 +103,21 @@ export function TelegramChatWindow({
 
   if (!contact) return <EmptyConversationState />
   const isGroupChat = contact.type === 'group'
+  const showAuthors = isGroupChat || showSenderNames
 
   return (
     <div className="chat-window">
       <ChatHeader
         contact={contact}
         isGroupChat={isGroupChat}
+        conversationTypeLabel={showSenderNames ? '本地会话 · 类型尚未解析' : undefined}
         loadedCount={messages.length}
         filteredCount={filtered.length}
         contentFilter={contentFilter}
         isAiLoading={false}
         onContentFilterChange={onContentFilterChange || (() => undefined)}
         onRefresh={onRefresh}
-        showSendAction
+        showSendAction={showSendAction}
         sendActionSupported={sendActionSupported}
         sendUnavailableReason={sendUnavailableReason}
         sendLabel="发送"
@@ -139,7 +145,7 @@ export function TelegramChatWindow({
             const first = group.messages[0]
             const name = group.isMine
               ? '我'
-              : isGroupChat
+              : showAuthors
                 ? first.name || first.from
                 : contact.m_nsNickName
             return (
@@ -154,7 +160,7 @@ export function TelegramChatWindow({
                   <MessageGroup
                     group={group}
                     contact={contact}
-                    isGroupChat={isGroupChat}
+                    isGroupChat={showAuthors}
                     showAvatar
                     onImageClick={setPreviewImage}
                   />
@@ -176,7 +182,7 @@ export function TelegramChatWindow({
                         </div>
                       )}
                       <div className="message-stack">
-                        {!group.isMine && isGroupChat && (
+                        {!group.isMine && showAuthors && (
                           <div className="message-sender-name">{name}</div>
                         )}
                         {group.messages.map((message, index) => {
@@ -206,7 +212,7 @@ export function TelegramChatWindow({
                               key={message.id}
                               message={message}
                               contact={contact}
-                              isGroupChat={isGroupChat}
+                              isGroupChat={showAuthors}
                               isMine={group.isMine}
                               showAvatarSpace={index === 0}
                               onImageClick={setPreviewImage}

@@ -123,6 +123,236 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('TelegramReadWorkspace', () => {
+  it('pages native macOS snapshots on request and never exposes Desktop actions', async () => {
+    const secondConversation = {
+      ...conversation(),
+      id: serializeEntityId({
+        source: 'telegram',
+        account: 'fixture-account',
+        native: 'chat/native-second'
+      }),
+      title: '合成原生会话二'
+    }
+    const nativeSnapshot: ProviderSnapshot = {
+      ...snapshot,
+      health: { state: 'ready', available: true, message: '合成原生本地快照，不代表完整云端历史' },
+      send: {
+        capabilities: { ...snapshot.capabilities, canSend: true },
+        health: { state: 'ready', available: true }
+      }
+    }
+    const listConversations = vi.fn(async ({ cursor }: { cursor?: string }) =>
+      cursor
+        ? { items: [secondConversation] }
+        : { items: [conversation()], nextCursor: 'native-conversation-next' }
+    )
+    const listMessages = vi.fn(async ({ cursor }: { cursor?: string }) =>
+      cursor
+        ? {
+            items: [
+              message(
+                'native-earlier',
+                {
+                  type: 'unknown',
+                  platformType: 'telegram-macos-media',
+                  raw: {}
+                },
+                {
+                  telegramMacOS: {
+                    mediaCount: 1,
+                    media: [
+                      {
+                        kind: 'voice',
+                        mimeType: 'audio/ogg',
+                        byteLength: 2048,
+                        durationSeconds: 12.5,
+                        metadataState: 'decoded'
+                      }
+                    ]
+                  }
+                }
+              )
+            ]
+          }
+        : {
+            items: [
+              {
+                ...message(
+                  'native-first',
+                  { type: 'text', text: '合成原生消息' },
+                  {
+                    telegramMacOS: {
+                      mediaCount: 1,
+                      media: [
+                        {
+                          kind: 'file',
+                          filename: 'synthetic-report.pdf',
+                          mimeType: 'application/pdf',
+                          byteLength: 4096,
+                          width: 640,
+                          height: 480,
+                          metadataState: 'decoded'
+                        }
+                      ]
+                    }
+                  }
+                ),
+                senderId: serializeEntityId({
+                  source: 'telegram',
+                  account: 'fixture-account',
+                  native: 'author/1001'
+                })
+              }
+            ],
+            nextCursor: 'native-message-next'
+          }
+    )
+    const desktopHistory = vi.fn()
+    const desktopSend = vi.fn()
+    const desktopMedia = vi.fn()
+    window.api = {
+      getUnifiedProviderSnapshot: vi.fn().mockResolvedValue(nativeSnapshot),
+      listUnifiedConversations: listConversations,
+      listUnifiedMessages: listMessages,
+      loadTelegramHistory: desktopHistory,
+      sendUnifiedMessage: desktopSend,
+      loadTelegramMedia: desktopMedia
+    } as unknown as typeof window.api
+    render(
+      <TooltipProvider>
+        <TelegramReadWorkspace
+          snapshot={nativeSnapshot}
+          localClientType="telegram-macos"
+          onRefreshLocal={vi.fn()}
+        />
+      </TooltipProvider>
+    )
+    expect(await screen.findByText(/合成原生消息/)).toHaveTextContent(
+      '含 1 个附件（仅有本地元数据，内容尚未读取）'
+    )
+    expect(screen.getByText(/合成原生消息/)).toHaveTextContent(
+      '文件 · synthetic-report.pdf · application/pdf · 4 KiB · 640 × 480'
+    )
+    expect(screen.getByText('用户 1001')).toBeVisible()
+    expect(screen.queryByText('telegram:fixture-account:author%2F1001')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^会话/ })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /^群聊|^联系人/ })).not.toBeInTheDocument()
+    expect(listConversations).toHaveBeenCalledTimes(1)
+    expect(listMessages).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: '发送' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /补载|在 Telegram 中加载|下载/ })
+    ).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '加载更多本地会话' }))
+    expect(await screen.findByRole('button', { name: /合成原生会话二/ })).toBeVisible()
+    expect(listConversations).toHaveBeenLastCalledWith({
+      context: { expected: context, scope: { kind: 'all' } },
+      cursor: 'native-conversation-next',
+      limit: 100
+    })
+    await userEvent.click(screen.getByRole('button', { name: '加载更早的本地消息' }))
+    expect(await screen.findByText(/附件消息（仅有本地元数据，内容尚未读取）/)).toHaveTextContent(
+      '语音 · audio/ogg · 2 KiB · 12.5 秒'
+    )
+    expect(screen.getByText('未知发送者')).toBeVisible()
+    expect(listMessages).toHaveBeenLastCalledWith({
+      context: { expected: context, scope: { kind: 'all' } },
+      conversationId,
+      cursor: 'native-message-next',
+      limit: 50
+    })
+    expect(screen.queryByRole('button', { name: '加载更早的本地消息' })).not.toBeInTheDocument()
+    expect(desktopHistory).not.toHaveBeenCalled()
+    expect(desktopSend).not.toHaveBeenCalled()
+    expect(desktopMedia).not.toHaveBeenCalled()
+  })
+
+  it('discards a native page that resolves after switching conversations', async () => {
+    const secondId = serializeEntityId({
+      source: 'telegram',
+      account: 'fixture-account',
+      native: 'chat/native-second'
+    })
+    let finish!: (value: { items: Message[]; nextCursor?: string }) => void
+    const listMessages = vi.fn(
+      ({ conversationId: selected, cursor }: { conversationId: string; cursor?: string }) => {
+        if (selected === secondId)
+          return Promise.resolve({
+            items: [
+              {
+                ...message('native-second', { type: 'text', text: '合成新会话消息' }),
+                senderId: serializeEntityId({
+                  source: 'telegram',
+                  account: 'fixture-account',
+                  native: 'author/1002'
+                })
+              }
+            ]
+          })
+        if (cursor)
+          return new Promise<{ items: Message[]; nextCursor?: string }>((resolve) => {
+            finish = resolve
+          })
+        return Promise.resolve({
+          items: [message('native-first', { type: 'text', text: '合成原会话消息' })],
+          nextCursor: 'native-pending'
+        })
+      }
+    )
+    window.api = {
+      listUnifiedConversations: vi.fn().mockResolvedValue({
+        items: [conversation(), { ...conversation(), id: secondId, title: '合成新会话' }]
+      }),
+      listUnifiedMessages: listMessages
+    } as unknown as typeof window.api
+    render(
+      <TooltipProvider>
+        <TelegramReadWorkspace snapshot={snapshot} localClientType="telegram-macos" />
+      </TooltipProvider>
+    )
+    expect(await screen.findByText('合成原会话消息')).toBeVisible()
+    await userEvent.click(screen.getByRole('button', { name: '加载更早的本地消息' }))
+    await userEvent.click(screen.getByRole('button', { name: /合成新会话/ }))
+    expect(await screen.findByText('合成新会话消息')).toBeVisible()
+    expect(screen.getByText('用户 1002')).toBeVisible()
+    expect(screen.queryByText('telegram:fixture-account:author%2F1002')).not.toBeInTheDocument()
+    await act(async () =>
+      finish({
+        items: [message('native-stale', { type: 'text', text: '不应显示的旧分页' })],
+        nextCursor: 'native-stale-next'
+      })
+    )
+    expect(screen.queryByText('不应显示的旧分页')).not.toBeInTheDocument()
+    expect(screen.queryByText('合成原会话消息')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '加载更早的本地消息' })).not.toBeInTheDocument()
+  })
+
+  it('does not read native conversations when capabilities are unavailable or source context mismatches', async () => {
+    const listConversations = vi.fn()
+    window.api = { listUnifiedConversations: listConversations } as unknown as typeof window.api
+    const unavailable = {
+      ...snapshot,
+      health: { state: 'offline' as const, available: false, message: '原生运行时版本不兼容' }
+    }
+    const view = render(
+      <TooltipProvider>
+        <TelegramReadWorkspace snapshot={unavailable} localClientType="telegram-macos" />
+      </TooltipProvider>
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('原生运行时版本不兼容')
+    expect(listConversations).not.toHaveBeenCalled()
+    view.rerender(
+      <TooltipProvider>
+        <TelegramReadWorkspace
+          snapshot={{ ...snapshot, context: { ...context, source: 'wechat' } }}
+          localClientType="telegram-macos"
+        />
+      </TooltipProvider>
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('Telegram 数据源上下文尚未就绪')
+    expect(listConversations).not.toHaveBeenCalled()
+  })
+
   it('renders exported group names and sender names with a disabled send action', async () => {
     const listMessages = vi.fn().mockResolvedValue({
       items: [

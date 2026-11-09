@@ -8,6 +8,7 @@ export const telegramStorageDescriptionSchema = z
     protocol: z.literal(1),
     version: z.string().min(1),
     methods: z.array(z.string()),
+    clientTypes: z.array(z.enum(['telegram-desktop', 'telegram-macos'])).optional(),
     platform: z.string(),
     arch: z.string()
   })
