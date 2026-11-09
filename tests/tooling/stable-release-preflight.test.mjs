@@ -46,6 +46,23 @@ test('rejects developer and revoked signing identities', () => {
   }
 })
 
+test('unsigned mode waives only identity and notarization profile requirements', () => {
+  const input = valid()
+  input.identityOutput = ''; input.profile = ''; input.unsigned = true
+  assert.deepEqual(checkStableReadiness(input), [])
+  input.packages[0].releaseStatus = 'development-only'
+  input.version = '0.0.0-migration.10'
+  input.clean = false
+  assert.deepEqual(checkStableReadiness(input), [
+    'package version must be 1.0.0',
+    'checkout must be clean and committed',
+    'wechat requires exactly one stable macOS arm64 runtime'
+  ])
+  input.unsigned = false
+  assert.ok(checkStableReadiness(input).some((issue) => issue.includes('signing identity')))
+  assert.ok(checkStableReadiness(input).some((issue) => issue.includes('APPLE_KEYCHAIN_PROFILE')))
+})
+
 test('requires a Developer ID authority and a team identifier on the built application', () => {
   const details = 'Authority=Developer ID Application: Synthetic (1234567890)\nTeamIdentifier=1234567890\n'
   assert.equal(isDeveloperIdSignature(0, details), true)
@@ -65,6 +82,9 @@ test('merged stable configuration requires distribution signing and notarization
   assert.equal(config.mac.type, 'distribution')
   assert.equal(config.mac.hardenedRuntime, true)
   assert.equal(config.mac.notarize, true)
+  const unsignedConfig = await getConfig(process.cwd(), 'electron-builder.release.yml', null)
+  assert.equal(unsignedConfig.mac.identity, null)
+  assert.equal(unsignedConfig.mac.notarize, false)
 })
 
 test('stable build stops before generating output when preflight fails', (t) => {
@@ -82,5 +102,12 @@ test('stable build stops before generating output when preflight fails', (t) => 
   })
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /Stable release preflight failed/)
+  assert.equal(existsSync(output), false)
+  const unsigned = spawnSync(process.execPath, [join(root, 'scripts/build-stable-candidate.mjs'), '--unsigned', output], {
+    cwd: root, encoding: 'utf8', env: { ...process.env, APPLE_KEYCHAIN_PROFILE: '' }
+  })
+  assert.notEqual(unsigned.status, 0)
+  assert.match(unsigned.stderr, /wechat requires exactly one stable macOS arm64 runtime/)
+  assert.match(unsigned.stderr, /package version must be 1\.0\.0/)
   assert.equal(existsSync(output), false)
 })

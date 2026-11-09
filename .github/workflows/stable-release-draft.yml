@@ -1,0 +1,73 @@
+name: Build unsigned macOS stable draft
+
+on:
+  push:
+    tags: ['v1.0.0']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-stable-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: node scripts/check-stable-release-tag.mjs
+      - run: corepack pnpm install --frozen-lockfile
+      - run: node scripts/stable-release-preflight.mjs --unsigned
+      - run: corepack pnpm exec playwright install chromium
+      - run: corepack pnpm typecheck
+      - run: corepack pnpm test:unit
+      - run: corepack pnpm test:component
+      - run: corepack pnpm test:skill-install
+      - run: node --test tests/tooling/public-app-export.test.mjs tests/tooling/macos-signing.test.cjs tests/tooling/ffmpeg-license.test.cjs tests/tooling/release-artifacts.test.mjs tests/tooling/stable-release-preflight.test.mjs tests/tooling/packaged-license-audit.test.cjs tests/tooling/stable-release-workflow.test.mjs
+      - run: python3 scripts/test_prepare_public_ffmpeg.py
+      - run: corepack pnpm test:e2e:build
+      - run: python3 scripts/prepare-public-ffmpeg.py build --download
+      - run: FFMPEG_BIN="$PWD/.tmp/public-ffmpeg/ffmpeg" corepack pnpm test:ffmpeg
+      - run: corepack pnpm build:stable:candidate --unsigned
+      - name: Smoke test the packaged application
+        run: node scripts/smoke-packaged.mjs "$PWD/dist/stable-candidate/mac-arm64/语屿 YUYU.app/Contents/MacOS/语屿 YUYU" --fresh --release
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-stable-mac-arm64
+          if-no-files-found: error
+          path: |
+            dist/stable-candidate/*.dmg
+            dist/stable-candidate/*.zip
+            dist/stable-candidate/*.blockmap
+            dist/stable-candidate/latest-mac.yml
+            dist/stable-candidate/release-manifest-mac-arm64.json
+  draft:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-stable-mac-arm64
+          path: dist/release-upload
+      - name: Create and verify stable draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/create-stable-draft.mjs
