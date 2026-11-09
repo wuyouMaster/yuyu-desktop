@@ -2,7 +2,7 @@
 // This is a partial evidence check: it does not inventory bundled JS, native
 // transitive dependencies, or establish license compliance.
 const { createRequire } = require('node:module')
-const { resolve } = require('node:path')
+const { resolve, sep } = require('node:path')
 
 const builderRequire = createRequire(require.resolve('electron-builder'))
 const asar = createRequire(builderRequire.resolve('app-builder-lib'))('@electron/asar')
@@ -13,8 +13,9 @@ function normalizeArchivePath(entry) {
   return entry.replaceAll('\\', '/').replace(/^\/+/, '')
 }
 
-function auditPackageLicenseFiles(archive) {
-  const entries = asar.listPackage(archive).map(normalizeArchivePath)
+function auditPackageLicenseFiles(archive, { archiveApi = asar, separator = sep } = {}) {
+  const entries = archiveApi.listPackage(archive).map(normalizeArchivePath)
+  const nativePath = (entry) => entry.replaceAll('/', separator)
   const manifests = entries.filter((entry) => manifestPattern.test(entry)).sort()
   const packages = manifests.map((manifest) => {
     const root = manifest.slice(0, -'package.json'.length)
@@ -22,11 +23,11 @@ function auditPackageLicenseFiles(archive) {
       if (!entry.startsWith(root)) return false
       const relative = entry.slice(root.length)
       return !relative.includes('/') && licensePattern.test(relative) &&
-        asar.statFile(archive, entry).size > 0
+        archiveApi.statFile(archive, nativePath(entry)).size > 0
     }).sort()
     let metadata
     try {
-      metadata = JSON.parse(asar.extractFile(archive, manifest).toString('utf8'))
+      metadata = JSON.parse(archiveApi.extractFile(archive, nativePath(manifest)).toString('utf8'))
     } catch {
       return { path: root.slice(0, -1), error: 'unreadable package metadata', licenseFiles }
     }

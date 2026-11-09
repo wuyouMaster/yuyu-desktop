@@ -2,7 +2,7 @@ const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')
-const { join } = require('node:path')
+const { join, sep } = require('node:path')
 const { createRequire } = require('node:module')
 const builderRequire = createRequire(require.resolve('electron-builder'))
 const asar = createRequire(builderRequire.resolve('app-builder-lib'))('@electron/asar')
@@ -56,4 +56,33 @@ test('does not count an empty license file as evidence', async (t) => {
   const archive = join(root, 'app.asar')
   await asar.createPackage(join(root, 'input'), archive)
   assert.equal(auditPackageLicenseFiles(archive).unresolved[0].name, 'fixture-empty')
+})
+
+test('uses Windows-native paths for ASAR lookup after normalizing listings', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'synthetic-license-audit-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const pkg = join(root, 'input/node_modules/fixture-windows')
+  mkdirSync(pkg, { recursive: true })
+  writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: 'fixture-windows', version: '1.0.0' }))
+  writeFileSync(join(pkg, 'LICENSE'), 'Synthetic fixture license')
+  const archive = join(root, 'app.asar')
+  await asar.createPackage(join(root, 'input'), archive)
+  const checked = []
+  const windowsApi = {
+    listPackage: (file) => asar.listPackage(file).map((entry) => entry.replaceAll('/', '\\')),
+    statFile: (file, entry) => {
+      assert.ok(entry.includes('\\') && !entry.includes('/'))
+      checked.push(entry)
+      return asar.statFile(file, entry.replaceAll('\\', sep))
+    },
+    extractFile: (file, entry) => {
+      assert.ok(entry.includes('\\') && !entry.includes('/'))
+      checked.push(entry)
+      return asar.extractFile(file, entry.replaceAll('\\', sep))
+    }
+  }
+  const result = auditPackageLicenseFiles(archive, { archiveApi: windowsApi, separator: '\\' })
+  assert.equal(result.packageCount, 1)
+  assert.deepEqual(result.unresolved, [])
+  assert.equal(checked.length, 2)
 })
