@@ -94,7 +94,8 @@ export function RuntimeManagerSection({
     <section className="settings-card" aria-label="应用运行时管理">
       <h2 className="settings-section-heading">应用运行时</h2>
       <p className="text-muted-foreground text-sm">
-        主应用独立启动，按需安装各应用的固定版本工具。当前提供开发验证版本。
+        主应用独立启动，按需安装运行时。微信、钉钉和 Telegram
+        运行时均为实验性版本，兼容性取决于客户端版本。
       </p>
       <p className="text-muted-foreground text-sm">
         公开 HTTPS 链接无需凭据；私有 GitHub

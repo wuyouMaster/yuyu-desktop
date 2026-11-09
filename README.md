@@ -35,7 +35,8 @@ corepack pnpm dev
 启动时账号发现只检查是否存在已保存的数据库密钥；需要读取密钥时才访问系统安全存储。
 
 当前 macOS arm64 默认公开目录为微信 `0.1.0-dev.13`、钉钉 `0.1.0-dev.2` 和 Telegram
-`0.1.0-dev.5`，能力以实际界面和协议检查为准。旧包安装成功不代表新协议可用。
+`0.1.0-dev.5`，三个运行时均为实验性开发预览。桌面 1.0.0 正式发布不改变它们的
+`development-only` 状态；能力以实际界面和协议检查为准。旧包安装成功不代表新协议可用。
 开发验收可由主进程用 `YUYU_RUNTIME_TEST_CATALOG` 指定绝对路径的固定摘要目录，
 打包应用不接受该覆盖；Renderer 不能提供目录、命令或 host 路径。正式地址只能在新产物
 发布并核对匿名下载后更新。
@@ -150,7 +151,9 @@ ZIP、Windows NSIS 安装程序、更新元数据、blockmap 和平台清单，�
 签名、公证、ZIP 和实际升级验证；Windows 需要 NSIS 安装包及目标平台更新验证。预发布与稳定
 渠道的版本策略、发布及真实升级结果须另行核验，不能把模拟事件或目录构建当成上线成功。
 
-桌面稳定版目标为 1.0.0、macOS arm64，三个独立运行时也须先达到稳定版。运行
+桌面正式版目标为 1.0.0、macOS arm64，三个独立运行时继续提供实验性开发预览。
+本次采用无 Developer ID 签名、公证的发行方式，范围和限制见
+[1.0.0 发布说明](docs/releases/1.0.0.md)。运行
 `corepack pnpm release:stable:preflight` 可检查本机平台、版本、干净工作区、Developer ID
 Application 身份、公证钥匙串配置名称以及运行时目录中的稳定版本状态；它不会构建、上传或
 发布，也不会输出凭据。检查通过不代表凭据有效、签名或公证成功，更不代表真实账号、安装或
@@ -166,7 +169,19 @@ macOS arm64、1.0.0、干净提交及三个稳定运行时；候选只保留本�
 实际安装、更新、运行时及第三方许可仍需单独验收。
 `v1.0.0` 标签有单独的 macOS arm64 无签名草稿工作流；预览工作流会跳过稳定标签。该流程
 只上传未公开的草稿并回读核验附件，不会自动公开；标签推送会触发 Actions，仍需取得本次
-推送授权。运行时目录当前仍为开发预览，稳定运行时条件满足前构建会停止。
+推送授权。默认预检仍要求稳定运行时；按本次发行范围，工作流显式附加
+`--allow-experimental-runtimes`，允许版本号带预发布后缀、状态为 `development-only`
+的固定目录项，仍拒绝缺失、重复、平台错误或状态与版本不一致的运行时。目录状态不改写，
+发布说明和管理界面保留实验性提示。本机对应命令为：
+
+```sh
+corepack pnpm release:stable:preflight --unsigned --allow-experimental-runtimes
+corepack pnpm build:stable:candidate --unsigned --allow-experimental-runtimes
+```
+
+本次正式版不提供 Windows 安装包或 `latest.yml`；既有 Windows 预览的更新检查可能因而失败，
+Windows 用户仍可从此前的预览 Release 页面下载原有安装包。macOS 继续通过 Release 页面
+下载更新，不启用未验收的应用内自动安装。
 
 可用 `corepack pnpm audit:packaged-licenses <app.asar 路径>` 离线列出归档内各 npm 包目录
 缺少非空许可证或 NOTICE 文件的情况；发现缺项或无法读取元数据时命令返回非零。该检查仅

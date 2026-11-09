@@ -63,6 +63,42 @@ test('unsigned mode waives only identity and notarization profile requirements',
   assert.ok(checkStableReadiness(input).some((issue) => issue.includes('APPLE_KEYCHAIN_PROFILE')))
 })
 
+test('experimental runtimes require an explicit choice and keep their original catalog status', () => {
+  const input = valid()
+  input.packages = input.packages.map((runtime) => ({ ...runtime, releaseStatus: 'development-only', version: '0.1.0-dev.5' }))
+  const before = JSON.stringify(input.packages)
+  assert.equal(checkStableReadiness(input).length, 3)
+  input.allowExperimentalRuntimes = true
+  assert.deepEqual(checkStableReadiness(input), [])
+  assert.equal(JSON.stringify(input.packages), before)
+  input.identityOutput = ''; input.profile = ''
+  assert.equal(checkStableReadiness(input).length, 2)
+  input.unsigned = true
+  assert.deepEqual(checkStableReadiness(input), [])
+})
+
+test('experimental mode still rejects missing, duplicated, mismatched and malformed runtimes', () => {
+  const input = { ...valid(), unsigned: true, allowExperimentalRuntimes: true }
+  for (const runtime of [
+    { releaseStatus: 'unknown', version: '0.1.0-dev.5' },
+    { releaseStatus: 'stable', version: '0.1.0-dev.5' },
+    { releaseStatus: 'development-only', version: '1.0.0' },
+    { releaseStatus: 'development-only', version: '0.1.0-dev.05' },
+    { releaseStatus: 'development-only', version: '0.1.0-dev.5/unsafe' },
+    { releaseStatus: 'development-only', version: '0.1.0-' }
+  ]) {
+    input.packages = valid().packages
+    Object.assign(input.packages[0], runtime)
+    assert.equal(checkStableReadiness(input).length, 1, JSON.stringify(runtime))
+  }
+  for (const packages of [[], [...valid().packages, valid().packages[0]], valid().packages.map((p) => ({ ...p, target: 'win-x64' }))]) {
+    assert.ok(checkStableReadiness({ ...input, packages }).some((issue) => issue.includes('runtime')))
+  }
+  assert.deepEqual(checkStableReadiness({ ...input, packages: valid().packages, version: '1.0.0-rc.1', clean: false, arch: 'x64' }), [
+    'stable candidate requires macOS arm64', 'package version must be 1.0.0', 'checkout must be clean and committed'
+  ])
+})
+
 test('requires a Developer ID authority and a team identifier on the built application', () => {
   const details = 'Authority=Developer ID Application: Synthetic (1234567890)\nTeamIdentifier=1234567890\n'
   assert.equal(isDeveloperIdSignature(0, details), true)
@@ -110,4 +146,18 @@ test('stable build stops before generating output when preflight fails', (t) => 
   assert.match(unsigned.stderr, /wechat requires exactly one stable macOS arm64 runtime/)
   assert.match(unsigned.stderr, /package version must be 1\.0\.0/)
   assert.equal(existsSync(output), false)
+  const experimental = spawnSync(process.execPath, [join(root, 'scripts/build-stable-candidate.mjs'), '--unsigned', '--allow-experimental-runtimes', output], {
+    cwd: root, encoding: 'utf8'
+  })
+  assert.notEqual(experimental.status, 0)
+  assert.match(experimental.stderr, /wechat requires exactly one stable or explicitly experimental macOS arm64 runtime/)
+  assert.match(experimental.stderr, /package version must be 1\.0\.0/)
+  assert.equal(existsSync(output), false)
+  for (const script of ['build-stable-candidate.mjs', 'stable-release-preflight.mjs']) {
+    for (const flags of [['--allow-experimental-runtime'], ['--unsigned', '--unsigned'], ['--allow-experimental-runtimes', '--allow-experimental-runtimes']]) {
+      const invalid = spawnSync(process.execPath, [join(root, 'scripts', script), ...flags], { cwd: root, encoding: 'utf8' })
+      assert.notEqual(invalid.status, 0)
+      assert.match(invalid.stderr, /Usage:/)
+    }
+  }
 })

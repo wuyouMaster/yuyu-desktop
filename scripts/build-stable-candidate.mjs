@@ -5,13 +5,15 @@ import { delimiter, join, resolve } from 'node:path'
 import { createRequire } from 'node:module'
 import { isDeveloperIdSignature } from './stable-release-preflight.mjs'
 
-// Unsigned builds require an explicit flag and retain every other preflight.
+// Signing and experimental-runtime exceptions are separate explicit choices.
 const args = process.argv.slice(2)
-const unsigned = args[0] === '--unsigned'
-const remaining = unsigned ? args.slice(1) : args
-if (remaining.length > 1 || remaining.some((arg) => arg.startsWith('--')))
-  throw new Error('Usage: build-stable-candidate.mjs [--unsigned] [output-directory]')
-execFileSync(process.execPath, ['scripts/stable-release-preflight.mjs', ...(unsigned ? ['--unsigned'] : [])], { stdio: 'inherit' })
+const flags = args.filter((arg) => arg.startsWith('--'))
+const unsigned = flags.includes('--unsigned')
+const remaining = args.filter((arg) => !arg.startsWith('--'))
+if (remaining.length > 1 || new Set(flags).size !== flags.length ||
+    flags.some((flag) => !['--unsigned', '--allow-experimental-runtimes'].includes(flag)))
+  throw new Error('Usage: build-stable-candidate.mjs [--unsigned] [--allow-experimental-runtimes] [output-directory]')
+execFileSync(process.execPath, ['scripts/stable-release-preflight.mjs', ...flags], { stdio: 'inherit' })
 const output = resolve(remaining[0] || 'dist/stable-candidate')
 if (existsSync(output)) throw new Error('Stable candidate output already exists; use a new directory')
 const require = createRequire(import.meta.url)

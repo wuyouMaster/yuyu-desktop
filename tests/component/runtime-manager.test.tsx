@@ -21,6 +21,7 @@ describe('runtime manager', () => {
       api.listRuntimeInstallations.mockResolvedValue([{ ...item, status: 'installed' }])
     })
     render(<RuntimeManagerSection />)
+    expect(screen.getByText(/运行时均为实验性版本，兼容性取决于客户端版本/)).toBeVisible()
     await user.click(await screen.findByRole('button', { name: '安装 微信' }))
     expect(api.installRuntime).toHaveBeenCalledWith({
       application: 'wechat',

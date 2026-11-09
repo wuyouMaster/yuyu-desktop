@@ -14,6 +14,8 @@ test('runtime management remains accessible beside the connected source selector
     const dialog = page.getByRole('dialog', { name: '管理应用运行时' })
     await expect(dialog).toBeVisible()
     await expect(dialog.getByRole('region', { name: '应用运行时管理' })).toBeVisible()
+    await expect(dialog.getByText(/运行时均为实验性版本，兼容性取决于客户端版本/)).toBeVisible()
+    await page.screenshot({ path: '.tmp/runtime-experimental-notice.png' })
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
     await expect(source).toHaveAttribute('aria-label', before!)

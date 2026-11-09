@@ -40,8 +40,24 @@ test('stable workflow builds only macOS and creates a draft while preview exclud
   const preview = yaml.load(readFileSync('.github/workflows/release-draft.yml', 'utf8'))
   assert.deepEqual(stable.on.push.tags, ['v1.0.0'])
   assert.equal(stable.jobs.build['runs-on'], 'macos-15')
-  assert.ok(stable.jobs.build.steps.some((step) => step.run === 'corepack pnpm build:stable:candidate --unsigned'))
+  assert.ok(stable.jobs.build.steps.some((step) => step.run === 'node scripts/stable-release-preflight.mjs --unsigned --allow-experimental-runtimes'))
+  assert.ok(stable.jobs.build.steps.some((step) => step.run === 'corepack pnpm build:stable:candidate --unsigned --allow-experimental-runtimes'))
   assert.ok(stable.jobs.draft.steps.some((step) => step.run === 'node scripts/create-stable-draft.mjs'))
   assert.equal(preview.jobs.build.if, "contains(github.ref_name, '-')")
   assert.equal(preview.jobs.draft.if, "contains(github.ref_name, '-')")
+})
+
+test('1.0.0 release notes retain the locked experimental runtime versions and release limits', () => {
+  const notes = readFileSync('docs/releases/1.0.0.md', 'utf8')
+  const catalog = JSON.parse(readFileSync('runtime.lock.json', 'utf8'))
+  for (const application of ['wechat', 'dingtalk', 'telegram']) {
+    const entries = catalog.packages.filter((p) => p.application === application && p.target === 'darwin-arm64')
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0].releaseStatus, 'development-only')
+    assert.ok(notes.includes('`' + entries[0].version + '`'))
+  }
+  assert.match(notes, /实验性开发预览/)
+  assert.match(notes, /未获 Apple Developer ID 签名或公证/)
+  assert.match(notes, /暂不提供应用内自动安装更新/)
+  assert.match(notes, /本次不提供 Windows 或 Intel Mac 正式安装包/)
 })

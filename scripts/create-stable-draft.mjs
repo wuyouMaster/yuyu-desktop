@@ -26,7 +26,8 @@ if (existing.split(/\r?\n/).includes(tag)) throw new Error('Release already exis
 const temp = mkdtempSync(join(tmpdir(), 'yuyu-stable-draft-'))
 try {
   const notes = join(temp, 'notes.md')
-  writeFileSync(notes, `YUYU 1.0.0 for macOS arm64.\n\nSource commit: ${head}\n\nThis build is not signed with Apple Developer ID and is not notarized. macOS Gatekeeper may block it. Application runtimes are installed separately. Installation, upgrade, real-account compatibility and third-party license obligations require separate acceptance.\n`)
+  const releaseNotes = readFileSync('docs/releases/1.0.0.md', 'utf8')
+  writeFileSync(notes, `${releaseNotes.trim()}\n\nSource commit: ${head}\n`)
   execFileSync('gh', ['release', 'create', tag, ...names.map((name) => join(directory, name)),
     '--repo', repo, '--verify-tag', '--draft', '--title', 'YUYU 1.0.0', '--notes-file', notes], { stdio: 'inherit' })
   const downloaded = join(temp, 'downloaded')

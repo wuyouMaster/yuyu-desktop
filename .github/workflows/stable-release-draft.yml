@@ -26,7 +26,7 @@ jobs:
       - run: corepack enable
       - run: node scripts/check-stable-release-tag.mjs
       - run: corepack pnpm install --frozen-lockfile
-      - run: node scripts/stable-release-preflight.mjs --unsigned
+      - run: node scripts/stable-release-preflight.mjs --unsigned --allow-experimental-runtimes
       - run: corepack pnpm exec playwright install chromium
       - run: corepack pnpm typecheck
       - run: corepack pnpm test:unit
@@ -37,7 +37,7 @@ jobs:
       - run: corepack pnpm test:e2e:build
       - run: python3 scripts/prepare-public-ffmpeg.py build --download
       - run: FFMPEG_BIN="$PWD/.tmp/public-ffmpeg/ffmpeg" corepack pnpm test:ffmpeg
-      - run: corepack pnpm build:stable:candidate --unsigned
+      - run: corepack pnpm build:stable:candidate --unsigned --allow-experimental-runtimes
       - name: Smoke test the packaged application
         run: node scripts/smoke-packaged.mjs "$PWD/dist/stable-candidate/mac-arm64/语屿 YUYU.app/Contents/MacOS/语屿 YUYU" --fresh --release
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
