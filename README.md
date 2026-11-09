@@ -124,6 +124,8 @@ FFmpeg。也可提前将这两份源归档放入 `.tmp/public-ffmpeg-sources/` �
 可执行文件，并在安装包内保留源码、许可和构建脚本。对已准备的二进制运行
 `FFMPEG_BIN="$PWD/.tmp/public-ffmpeg/ffmpeg" corepack pnpm test:ffmpeg` 验证合成音频转换。
 Windows 的 FFmpeg 和第三方许可仍需单独核对；本项目依赖的其他包也各有许可要求。
+聊天中的 `[微笑]` 等文本表情按消息原文显示，不再附带微信内置表情图片；独立表情包消息
+仍按现有媒体能力处理。
 
 推送与 `package.json` 版本完全一致的标签（例如 `v0.0.0-migration.6`）后，
 [发布工作流](.github/workflows/release-draft.yml) 在 macOS arm64 和 Windows x64 分别构建和

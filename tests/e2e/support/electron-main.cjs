@@ -5,6 +5,11 @@ const path = require('path')
 
 const root = path.resolve(__dirname, '../../..')
 const fixture = structuredClone(require(path.join(root, 'tests/fixtures/chat-data.json')))
+if (process.env.YUYU_E2E_TEXT_EMOJI === '1') {
+  const message = fixture.messages['group-regular-md5'].find((item) => item.id === 'msg-text')
+  message.content = '合成消息 [微笑] [未知表情] 🙂'
+  message.contentData = { type: 'text', content: message.content }
+}
 let imageKeyConfigured = process.env.YUYU_E2E_MISSING_IMAGE_KEY !== '1'
 const historyMessageCount = Number(process.env.YUYU_E2E_HISTORY_MESSAGES) || 0
 if (historyMessageCount > 0) {

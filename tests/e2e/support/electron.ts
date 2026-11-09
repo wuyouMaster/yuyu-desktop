@@ -29,6 +29,7 @@ export async function launchTestApp(
     updateSimulation?: boolean
     unsignedMacUpdate?: boolean
     realtimeReorder?: boolean
+    textEmojiFixture?: boolean
     now?: number
     appearanceTheme?: 'light' | 'dark'
     stableUserData?: string
@@ -78,6 +79,7 @@ export async function launchTestApp(
       YUYU_E2E_UPDATE_SIMULATION: options.updateSimulation ? '1' : '0',
       YUYU_E2E_UNSIGNED_MAC_UPDATE: options.unsignedMacUpdate ? '1' : '0',
       YUYU_E2E_REALTIME_REORDER: options.realtimeReorder ? '1' : '0',
+      YUYU_E2E_TEXT_EMOJI: options.textEmojiFixture ? '1' : '0',
       YUYU_E2E_NOW_MS: options.now ? String(options.now) : '',
       YUYU_E2E_APPEARANCE_THEME: options.appearanceTheme || 'light',
       YUYU_E2E_TEMPLATE_MARKET: options.templateMarket || 'off'

@@ -4,7 +4,6 @@ import { ImageBubble } from '../ImageBubble'
 import { RichMessageBubble } from '../RichMessageBubble'
 import { VoicePlayer } from '../VoicePlayer'
 import { VideoBubble } from '../VideoBubble'
-import { renderWechatEmojiText } from '../../utils/wechatEmojiText'
 import { formatMessageTime } from './messageGrouping'
 
 interface MessageBubbleProps {
@@ -105,7 +104,7 @@ export function MessageBubble({
             onImageClick={onImageClick}
           />
         ) : (
-          <div className="message-text">{renderWechatEmojiText(message.content)}</div>
+          <div className="message-text">{message.content}</div>
         )}
       </div>
       {message.recalled && (

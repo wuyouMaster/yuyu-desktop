@@ -1,7 +1,6 @@
 import { ParsedContent } from '../../../shared/types'
 import { useEffect, useState } from 'react'
 import type { JSX, MouseEvent } from 'react'
-import { renderWechatEmojiText } from '../utils/wechatEmojiText'
 import { resolveUnifiedAsset } from '../utils/unified-entity-adapter'
 import { ImageBubble } from './ImageBubble'
 import { Button } from './ui'
@@ -88,7 +87,7 @@ function ForwardBundleBubble({
               key={`${item.sender || ''}-${item.sentAt || ''}-${index}`}
             >
               {item.sender && <b>{item.sender}</b>}
-              <span>{renderWechatEmojiText(item.text, 24)}</span>
+              <span>{item.text}</span>
               {item.nested?.length ? <small>包含 {item.nested.length} 条聊天记录</small> : null}
             </div>
           ))
@@ -514,16 +513,16 @@ function QuoteBubble({
             onImageClick={onImageClick}
           />
         ) : (
-          <span className="quoted-text">{renderWechatEmojiText(quotedText, 18)}</span>
+          <span className="quoted-text">{quotedText}</span>
         )}
       </div>
-      {replyText && <div className="quote-reply">{renderWechatEmojiText(replyText)}</div>}
+      {replyText && <div className="quote-reply">{replyText}</div>}
     </div>
   )
 }
 
 function SystemBubble({ data }: { data: Extract<ParsedContent, { type: 'system' }> }): JSX.Element {
-  return <div className="message-text">{renderWechatEmojiText(data.content || '[系统消息]')}</div>
+  return <div className="message-text">{data.content || '[系统消息]'}</div>
 }
 
 function getUrlHost(url?: string): string {
