@@ -41,7 +41,7 @@ jobs:
       - run: corepack pnpm test:unit
       - run: corepack pnpm test:component
       - run: corepack pnpm test:skill-install
-      - run: node --test tests/tooling/public-app-export.test.mjs tests/tooling/macos-signing.test.cjs tests/tooling/ffmpeg-license.test.cjs tests/tooling/release-artifacts.test.mjs tests/tooling/stable-release-preflight.test.mjs
+      - run: node --test tests/tooling/public-app-export.test.mjs tests/tooling/macos-signing.test.cjs tests/tooling/ffmpeg-license.test.cjs tests/tooling/release-artifacts.test.mjs tests/tooling/stable-release-preflight.test.mjs tests/tooling/packaged-license-audit.test.cjs
       - name: Test macOS FFmpeg source preparation
         if: matrix.target == 'mac-arm64'
         run: python3 scripts/test_prepare_public_ffmpeg.py
